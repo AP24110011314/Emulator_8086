@@ -1,0 +1,31 @@
+{
+  "name": "emulator_8086",
+  "version": "1.0.0",
+  "description": "A browser-based emulator for the Intel 8086 microprocessor. Write 8086 assembly, assemble it, and step through execution while watching registers, flags, and memory update in real time.",
+  "main": "src/core/cpu.ts",
+  "scripts": {
+    "test": "vitest run",
+    "dev": "vite",
+    "build": "tsc --noEmit"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.2",
+    "@types/react": "^18.3.0",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^6.1.1",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.0",
+    "vitest": "^5.0.0"
+  },
+  "allowScripts": {
+    "fsevents@2.3.3": true
+  }
+}
