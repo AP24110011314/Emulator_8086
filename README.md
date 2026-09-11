@@ -53,17 +53,21 @@ Open [http://localhost:5173](http://localhost:5173) in your browser.
 ```bash
 npm test
 ```
-____
+---
 
 ## 📸 Screenshots
 
 ### Emulator Interface
 
 ![8086 Emulator Demo 1](./screenshots/demo1.png)
+---
 
 ### Emulator Execution
 
 ![8086 Emulator Demo 2](./screenshots/demo2.png)
+---
+### Emulator Features
+![8086 Emulator Demo 1](./screenshots/help.png)
 ---
 
 ## 🗂️ Project Structure
