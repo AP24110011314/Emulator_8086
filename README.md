@@ -94,7 +94,21 @@ output opens in a separate Console window automatically, a CPU Details page
 (Registers / Flags / Stack / Memory) shares the live CPU, and Open/Save use
 native Finder dialogs.
 
+## 📸 Screenshots Of MacOS App
+
+### Emulator App Interface
+
+![8086 Emulator Demo 1](./screenshots/home.png)
 ---
+
+### Emulator Execution and features
+
+![8086 Emulator Demo 2](./screenshots/1.png)
+---
+### Emulator CPU Details Section
+![8086 Emulator Demo 1](./screenshots/2.png)
+---
+
 
 ## 🗂️ Project Structure
 
