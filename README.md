@@ -1,11 +1,12 @@
 # 🖥️ 8086 Emulator
 
-> **A browser-based Intel 8086 microprocessor emulator** — write x86 assembly, assemble it, and step through execution watching registers, flags, and memory update in real time.
+> **A browser-based Intel 8086 microprocessor emulator** — write x86 assembly, assemble it, and step through execution watching registers, flags, and memory update in real time. Also available as a **native macOS desktop app** (see below).
 
 [![TypeScript](https://img.shields.io/badge/TypeScript-7.x-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)](https://react.dev/)
 [![Vite](https://img.shields.io/badge/Vite-5-646CFF?logo=vite&logoColor=white)](https://vitejs.dev/)
 [![Vitest](https://img.shields.io/badge/Tested_with-Vitest-6E9F18?logo=vitest&logoColor=white)](https://vitest.dev/)
+[![macOS app](https://img.shields.io/badge/macOS-App-000000?logo=apple&logoColor=white)](../../releases)
 
 ---
 
@@ -53,6 +54,31 @@ Open [http://localhost:5173](http://localhost:5173) in your browser.
 ```bash
 npm test
 ```
+
+---
+
+## 💻 macOS Desktop App (no Node.js needed)
+
+Prefer a native app over the browser? Grab the ready-made build from
+[GitHub Releases](../../releases):
+
+1. Download `Emulator8086_1.0.0_aarch64.dmg` (Apple Silicon Macs only).
+2. Double-click it, drag **Emulator8086** into **Applications**, eject the image.
+3. Launch **Emulator8086** from Applications or Spotlight.
+
+### One-time Gatekeeper unblock
+
+The app isn't Apple-signed, so macOS blocks the first launch. Either
+right-click **Emulator8086** → **Open** → **Open**, or run once in Terminal:
+
+```bash
+xattr -cr /Applications/Emulator8086.app
+```
+
+The desktop build runs the same emulator core with native extras: program
+output opens in a separate Console window automatically, a CPU Details page
+(Registers / Flags / Stack / Memory) shares the live CPU, and Open/Save use
+native Finder dialogs.
 
 ---
 
