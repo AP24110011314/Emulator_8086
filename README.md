@@ -98,15 +98,15 @@ native Finder dialogs.
 
 ### Emulator App Interface
 
-![8086 Emulator Demo 1](./screenshots/home.png)
+![8086 Emulator Demo 1](./screenshots/home_page.png)
 ---
 
 ### Emulator Execution and features
 
-![8086 Emulator Demo 2](./screenshots/1.png)
+![8086 Emulator Demo 2](./screenshots/2.png)
 ---
 ### Emulator CPU Details Section
-![8086 Emulator Demo 1](./screenshots/2.png)
+![8086 Emulator Demo 1](./screenshots/3.png)
 ---
 
 
