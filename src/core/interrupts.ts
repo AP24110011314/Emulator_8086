@@ -10,6 +10,25 @@ export interface InterruptIO {
   writeChar: (ch: string) => void;
   /** Called when INT 21h needs to read a character (returns char or null if none pending) */
   readChar: () => string | null;
+  /**
+   * Buffered line input for INT 21h AH=0Ah. Called with the DOS max-length
+   * from DS:DX; returns the submitted string (without the Enter terminator)
+   * or null if no line is available. Hosts without this fall back to
+   * consuming single chars via readChar.
+   */
+  readLine?: (maxChars: number) => string | null;
+  /**
+   * Non-destructive peek at the next pending character, if the host supports
+   * it. Status checks (INT 21h AH=0Bh, INT 16h AH=01h) must NOT consume input —
+   * without this they eat the keystroke the program is about to read.
+   * Hosts without peek fall back to readChar (legacy behavior).
+   */
+  peekChar?: () => string | null;
+}
+
+/** Status-check read: peek when the host supports it, consume otherwise. */
+function peekInput(io: InterruptIO): string | null {
+  return io.peekChar ? io.peekChar() : io.readChar();
 }
 
 // ─── INT 21h service handler ──────────────────────────────────────────────────
@@ -23,10 +42,13 @@ export function handleInt21h(cpu: CPU, io: InterruptIO): boolean {
 
   switch (ah) {
     case 0x01: {
-      // Read character from stdin (with echo) → AL
+      // Read character from stdin → AL, echoing it like real DOS (programs
+      // that want no echo use AH=08h instead). The echo lands in the console
+      // at the cursor position, same as the AH=0Ah line echo below.
       const ch = io.readChar();
       if (ch !== null) {
         cpu.writeRegister8('AL', ch.charCodeAt(0));
+        io.writeChar(ch);
       } else {
         cpu.writeRegister8('AL', 0);
       }
@@ -86,13 +108,47 @@ export function handleInt21h(cpu: CPU, io: InterruptIO): boolean {
     }
 
     case 0x0A: {
-      // Buffered keyboard input — simplified (not supported without real input)
+      // Buffered keyboard input — DS:DX points to a DOS input buffer:
+      //   [max_chars, chars_read, chars...]
+      // Reads a full line (up to max_chars), stores the actual count at
+      // DX+1 and the raw characters at DX+2. Bytes past the count are
+      // deliberately left untouched — programs pre-fill them (e.g. with
+      // '$' so a later AH=09h print terminates correctly).
+      const ds = cpu.readRegister16('DS');
+      const dx = cpu.readRegister16('DX');
+      const bufPhys = ((ds << 4) + dx) & 0xFFFFF;
+      const maxChars = cpu.readPhysical8(bufPhys);
+      let line: string | null;
+      if (io.readLine) {
+        line = io.readLine(maxChars);
+      } else {
+        // Legacy hosts only supply single chars: consume up to maxChars,
+        // stopping at Enter/end of queue.
+        let s = '';
+        for (let i = 0; i < maxChars; i++) {
+          const ch = io.readChar();
+          if (ch === null || ch === '\r' || ch === '\n') break;
+          s += ch;
+        }
+        line = s.length > 0 ? s : null;
+      }
+      if (line !== null) {
+        const text = line.slice(0, maxChars);
+        cpu.writePhysical8((bufPhys + 1) & 0xFFFFF, text.length);
+        for (let i = 0; i < text.length; i++) {
+          cpu.writePhysical8((bufPhys + 2 + i) & 0xFFFFF, text.charCodeAt(i) & 0xFF);
+        }
+        // Real DOS echoes the line as typed.
+        for (const ch of text) io.writeChar(ch);
+      } else {
+        cpu.writePhysical8((bufPhys + 1) & 0xFFFFF, 0);
+      }
       return false;
     }
 
     case 0x0B: {
-      // Check stdin status: AL=0xFF if ready, 0x00 if not
-      const ch = io.readChar();
+      // Check stdin status: AL=0xFF if ready, 0x00 if not (must not consume)
+      const ch = peekInput(io);
       cpu.writeRegister8('AL', ch !== null ? 0xFF : 0x00);
       return false;
     }
@@ -180,6 +236,32 @@ export function createInterruptHandler(io: InterruptIO) {
       }
 
       default:
+        // Handle INT 16h (BIOS keyboard services)
+        if (vector === 0x16) {
+          const ah = cpu.readRegister8('AH');
+          switch (ah) {
+            case 0x00: { // Read keystroke
+              const ch = io.readChar();
+              if (ch !== null) {
+                cpu.writeRegister8('AL', ch.charCodeAt(0));
+                cpu.setFlag('ZF', false);
+              } else {
+                cpu.writeRegister8('AL', 0);
+                cpu.setFlag('ZF', true);
+              }
+              break;
+            }
+            case 0x01: { // Check keystroke status (must not consume)
+              const ch = peekInput(io);
+              cpu.setFlag('ZF', ch === null);
+              cpu.writeRegister8('AL', ch !== null ? ch.charCodeAt(0) : 0);
+              break;
+            }
+            default:
+              break;
+          }
+          break;
+        }
         // Other vectors: no-op
         break;
     }

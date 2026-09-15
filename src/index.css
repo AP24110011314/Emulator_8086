@@ -36,6 +36,15 @@
   --accent-rose:    #e11d48;
   --accent-amber:   #d97706;
 
+  /* Vivid gradient fills (bright actions, active states) */
+  --grad-blue:      linear-gradient(135deg, #0ea5e9 0%, #2563eb 100%);
+  --grad-green:     linear-gradient(135deg, #22c55e 0%, #059669 100%);
+  --grad-amber:     linear-gradient(135deg, #f59e0b 0%, #ea580c 100%);
+  --grad-red:       linear-gradient(135deg, #fb7185 0%, #e11d48 100%);
+  --grad-violet:    linear-gradient(135deg, #8b5cf6 0%, #d946ef 100%);
+  --grad-page:      linear-gradient(180deg, #e0f2fe 0%, #eef4ff 200px, #f1f5f9 480px);
+  --grad-sidebar:   linear-gradient(180deg, #f0f9ff 0%, #f8fafc 260px);
+
   /* Text & Labels */
   --text-white:     #0f172a;
   --text-primary:   #1e293b;
@@ -80,10 +89,21 @@ html, body, #root {
 /* ── App Shell ── */
 .app {
   display: grid;
-  grid-template-rows: 50px 1fr;
+  grid-template-rows: 50px 1fr 32px;
   height: 100vh;
   overflow: hidden;
-  background: var(--bg-page);
+  background: var(--grad-page);
+}
+
+/* ── Bottom footer (Help lives at the bottom-right) ── */
+.app-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 0 14px;
+  background: var(--bg-toolbar);
+  border-top: 1px solid var(--border);
+  z-index: 100;
 }
 
 /* ── Top Toolbar ── */
@@ -94,7 +114,7 @@ html, body, #root {
   padding: 0 18px;
   background: var(--bg-toolbar);
   border-bottom: 1px solid var(--border);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+  box-shadow: 0 2px 10px rgba(2, 132, 199, 0.08);
   z-index: 100;
 }
 
@@ -106,7 +126,8 @@ html, body, #root {
 }
 
 .logo-chip {
-  background: linear-gradient(135deg, #0284c7, #6366f1);
+  background: linear-gradient(135deg, #0ea5e9, #8b5cf6);
+  box-shadow: 0 2px 8px rgba(14, 165, 233, 0.45);
   color: #fff;
   font-family: var(--font-mono);
   font-size: 11px;
@@ -142,12 +163,13 @@ html, body, #root {
   font-weight: 600;
   background: #f1f5f9;
   color: var(--text-secondary);
+  border: 1px solid var(--border);
 }
-.header-status.ready   { background: #ecfdf5; color: #059669; }
-.header-status.running { background: #dcfce7; color: #16a34a; }
-.header-status.paused  { background: #fef3c7; color: #d97706; }
-.header-status.halted  { background: #f1f5f9; color: var(--text-muted); }
-.header-status.error   { background: #ffe4e6; color: #e11d48; }
+.header-status.ready   { background: #d1fae5; color: #047857; border-color: #6ee7b7; }
+.header-status.running { background: #bbf7d0; color: #15803d; border-color: #4ade80; }
+.header-status.paused  { background: #fde68a; color: #b45309; border-color: #fbbf24; }
+.header-status.halted  { background: #f1f5f9; color: var(--text-muted); border-color: var(--border); }
+.header-status.error   { background: #fecdd3; color: #be123c; border-color: #fb7185; }
 
 .header-status-dot {
   width: 6px; height: 6px; border-radius: 50%;
@@ -191,16 +213,17 @@ html, body, #root {
 .sample-select:focus { border-color: var(--accent-cyan); }
 .sample-select option { background: #ffffff; color: var(--text-primary); }
 
-/* ? Help button light lilac pill */
+/* ? Help button vivid violet gradient pill */
 .btn-help-top {
-  background: var(--accent-purple);
-  color: var(--accent-purple-dark);
+  background: var(--grad-violet);
+  color: #ffffff;
   font-family: var(--font-ui);
   font-size: 12px;
   font-weight: 700;
   padding: 4px 14px;
   border-radius: 6px;
-  border: 1px solid #d8b4fe;
+  border: 1px solid transparent;
+  box-shadow: 0 2px 6px rgba(139, 92, 246, 0.4);
   cursor: pointer;
   transition: all var(--transition);
   display: inline-flex;
@@ -208,8 +231,8 @@ html, body, #root {
   gap: 4px;
 }
 .btn-help-top:hover {
-  background: #e9d5ff;
-  border-color: #c084fc;
+  filter: brightness(1.1);
+  border-color: transparent;
 }
 
 /* ── Main Layout ── */
@@ -217,7 +240,8 @@ html, body, #root {
   display: grid;
   grid-template-columns: 1fr 340px;
   overflow: hidden;
-  height: calc(100vh - 50px);
+  height: 100%;
+  min-height: 0;
 }
 
 /* ── Left Panel (Controls + Editor + Status) ── */
@@ -256,18 +280,109 @@ html, body, #root {
   user-select: none;
 }
 .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn:not(:disabled):active { transform: translateY(1px); }
 
-.btn-primary { background: #eff6ff; color: #0284c7; border-color: #bae6fd; }
-.btn-primary:not(:disabled):hover { background: #0284c7; color: #fff; border-color: #0284c7; }
+/* Visible keyboard focus for all interactive controls */
+.btn:focus-visible,
+.header-nav-btn:focus-visible,
+.btn-help-top:focus-visible,
+.clear-btn:focus-visible,
+.chip:focus-visible,
+.sample-select:focus-visible,
+.speed-slider:focus-visible {
+  outline: 2px solid var(--accent-cyan);
+  outline-offset: 2px;
+}
 
-.btn-success { background: #f0fdf4; color: #16a34a; border-color: #bbf7d0; }
-.btn-success:not(:disabled):hover { background: #16a34a; color: #fff; border-color: #16a34a; }
+/* Grouped toolbar: labeled Build / Execute clusters */
+.controls-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.controls-group-label {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+.controls-sep {
+  width: 1px;
+  height: 22px;
+  background: var(--border);
+  margin: 0 4px;
+}
 
-.btn-warning { background: #fefce8; color: #d97706; border-color: #fef08a; }
-.btn-warning:not(:disabled):hover { background: #d97706; color: #fff; border-color: #d97706; }
+/* Speed preset chips */
+.speed-presets {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.chip {
+  padding: 2px 8px;
+  border: 1px solid var(--border-light);
+  border-radius: 99px;
+  background: #ffffff;
+  color: var(--text-muted);
+  font-family: var(--font-ui);
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition);
+  white-space: nowrap;
+}
+.chip:hover {
+  border-color: var(--accent-cyan);
+  color: var(--accent-cyan);
+}
+.chip.active {
+  background: var(--grad-blue);
+  border-color: transparent;
+  color: #ffffff;
+  box-shadow: 0 2px 6px rgba(14, 165, 233, 0.4);
+}
+.chip:active { transform: translateY(1px); }
 
-.btn-danger { background: #fff1f2; color: #e11d48; border-color: #fecdd3; }
-.btn-danger:not(:disabled):hover { background: #e11d48; color: #fff; border-color: #e11d48; }
+/* Current file name in the editor header */
+.file-name {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Output character-count badge on the console launcher */
+.output-count-badge {
+  display: inline-block;
+  min-width: 20px;
+  text-align: center;
+  padding: 0 6px;
+  border-radius: 99px;
+  background: var(--accent-cyan);
+  color: #ffffff;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.6;
+}
+
+.btn-primary { background: var(--grad-blue); color: #fff; border-color: transparent; box-shadow: 0 2px 6px rgba(14, 165, 233, 0.4); }
+.btn-primary:not(:disabled):hover { filter: brightness(1.1); color: #fff; border-color: transparent; }
+
+.btn-success { background: var(--grad-green); color: #fff; border-color: transparent; box-shadow: 0 2px 6px rgba(34, 197, 94, 0.4); }
+.btn-success:not(:disabled):hover { filter: brightness(1.1); color: #fff; border-color: transparent; }
+
+.btn-warning { background: var(--grad-amber); color: #fff; border-color: transparent; box-shadow: 0 2px 6px rgba(245, 158, 11, 0.4); }
+.btn-warning:not(:disabled):hover { filter: brightness(1.08); color: #fff; border-color: transparent; }
+
+.btn-danger { background: var(--grad-red); color: #fff; border-color: transparent; box-shadow: 0 2px 6px rgba(244, 63, 94, 0.4); }
+.btn-danger:not(:disabled):hover { filter: brightness(1.08); color: #fff; border-color: transparent; }
 
 .btn-ghost { background: #ffffff; color: var(--text-secondary); border-color: var(--border-light); }
 .btn-ghost:not(:disabled):hover { background: var(--bg-box-hover); color: var(--text-primary); }
@@ -314,7 +429,7 @@ html, body, #root {
   align-items: center;
   justify-content: space-between;
   padding: 6px 14px;
-  background: #f8fafc;
+  background: linear-gradient(180deg, #ffffff 0%, #eef4ff 100%);
   border-bottom: 1px solid var(--border);
 }
 .panel-title {
@@ -382,7 +497,7 @@ html, body, #root {
   overflow-wrap: normal;
   caret-color: var(--accent-cyan);
 }
-.editor-textarea::selection { background: #bae6fd; }
+.editor-textarea::selection { background: #7dd3fc; }
 
 /* Status bar */
 .status-bar {
@@ -390,12 +505,17 @@ html, body, #root {
   align-items: center;
   gap: 14px;
   padding: 5px 14px;
-  background: #f8fafc;
+  background: linear-gradient(180deg, #ffffff 0%, #eef4ff 100%);
   border-top: 1px solid var(--border);
   font-size: 11px;
   color: var(--text-muted);
 }
 .status-item { display: flex; align-items: center; gap: 5px; }
+/* Segmented status bar: hairline separators between readout groups */
+.status-bar .status-item:not(:first-child) {
+  padding-left: 14px;
+  border-left: 1px solid var(--border);
+}
 .status-dot { width: 6px; height: 6px; border-radius: 50%; }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -406,7 +526,7 @@ html, body, #root {
   flex-direction: column;
   overflow-y: auto;
   overflow-x: hidden;
-  background: var(--bg-sidebar);
+  background: var(--grad-sidebar);
   border-left: 1px solid var(--border);
 }
 
@@ -420,16 +540,51 @@ html, body, #root {
 .sidebar-section {
   display: flex;
   flex-direction: column;
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 10px 12px 12px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+}
+/* Bare panels nested inside CPU Details cards: no double card chrome */
+.sidebar-section.bare {
+  background: none;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  box-shadow: none;
 }
 
-.sidebar-section-header {
+/* ── Unified section header ─────────────────────────────────────────────
+   Single shared style for EVERY section heading in the app: small accent
+   stripe + muted uppercase label + hairline rule. Used by both
+   .sidebar-section-header (Editor sidebar panels) and
+   .cpu-details-card-header (CPU Details cards). Per-section color comes
+   from --section-accent / --card-accent set below; no filled bars. */
+.sidebar-section-header,
+.cpu-details-card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-size: 10.5px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.9px;
   color: var(--text-muted);
-  padding-bottom: 7px;
+  padding-bottom: 8px;
+  margin-bottom: 10px;
+  border-bottom: 1px solid var(--border);
   user-select: none;
+}
+.sidebar-section-header::before,
+.cpu-details-card-header::before {
+  content: '';
+  width: 4px;
+  height: 14px;
+  border-radius: 2px;
+  background: var(--section-accent, var(--card-accent, var(--accent-cyan)));
+  box-shadow: 0 0 6px var(--section-accent, var(--card-accent, var(--accent-cyan)));
+  flex-shrink: 0;
 }
 
 .sidebar-divider {
@@ -479,6 +634,7 @@ html, body, #root {
   border-radius: 4px;
   padding: 2px 7px;
   font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -563,7 +719,8 @@ html, body, #root {
 
 .flag-tile.set {
   border-color: #22c55e;
-  background: #ecfdf5;
+  background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
+  box-shadow: 0 2px 8px rgba(34, 197, 94, 0.35);
 }
 .flag-tile.set .flag-tile-name { color: #15803d; }
 .flag-tile.set .flag-tile-value { color: #15803d; }
@@ -609,11 +766,11 @@ html, body, #root {
 }
 
 .led-circle.on {
-  background: var(--accent-green);
+  background: radial-gradient(circle at 35% 30%, #4ade80 0%, #22c55e 55%, #16a34a 100%);
   border: 1.5px solid #16a34a;
   color: #ffffff;
   font-weight: 700;
-  box-shadow: 0 0 10px rgba(22, 163, 74, 0.45);
+  box-shadow: 0 0 12px rgba(34, 197, 94, 0.65), 0 0 3px rgba(34, 197, 94, 0.9);
 }
 
 .led-value-text {
@@ -678,7 +835,7 @@ html, body, #root {
 .stack-list {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
 }
 
 .stack-item {
@@ -891,18 +1048,20 @@ html, body, #root {
 }
 
 .output-text {
-  color: #22c55e;
+  color: #4ade80;
   white-space: pre-wrap;
   line-height: 1.5;
   font-weight: 700;
   font-size: 12.5px;
   letter-spacing: 0.3px;
+  text-shadow: 0 0 8px rgba(74, 222, 128, 0.5);
 }
 
 .output-cursor {
   display: inline-block;
   width: 7px; height: 13px;
-  background: #22c55e;
+  background: #4ade80;
+  box-shadow: 0 0 6px rgba(74, 222, 128, 0.8);
   animation: blink 1s step-end infinite;
   vertical-align: text-bottom;
   margin-left: 2px;
@@ -1062,4 +1221,319 @@ html, body, #root {
   background: #f8fafc;
   display: flex;
   justify-content: flex-end;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   View navigation, CPU summary, CPU Details page, external console window
+   (UI/navigation restructuring — no emulator logic touched)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Header view tabs ── */
+.header-nav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: #f1f5f9;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 3px;
+}
+.header-nav-btn {
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: var(--text-secondary);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 12px;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+.header-nav-btn:hover { color: var(--text-primary); }
+.header-nav-btn.active {
+  background: #ffffff;
+  color: var(--accent-cyan);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+/* ── Console launcher note (editor sidebar) ── */
+.console-external-note {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--bg-card);
+  border: 1px dashed var(--border-light);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+
+/* ── CPU Details page ── */
+.app-main-full {
+  display: block;
+  grid-template-columns: none;
+  overflow-y: auto;
+}
+.cpu-details {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  background: var(--bg-page);
+}
+.cpu-details-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 18px;
+  background: var(--bg-toolbar);
+  border-bottom: 1px solid var(--border);
+}
+.cpu-details-heading {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-white);
+}
+.cpu-details-sub {
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+.cpu-details-grid {
+  display: grid;
+  grid-template-columns: minmax(300px, 380px) minmax(280px, 1fr);
+  gap: 14px;
+  padding: 14px 18px 24px;
+  align-items: start;
+}
+.cpu-details-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-top: 3px solid var(--card-accent, var(--accent-cyan));
+  border-radius: var(--radius-lg);
+  padding: 12px 14px;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.07);
+}
+/* (Unified header rules live in the shared block above; per-card accents below.) */
+.cpu-details-side {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.cpu-details-memory {
+  grid-column: 1 / -1;
+}
+.cpu-details-memory .memory-hex-body { max-height: 260px; }
+@media (max-width: 900px) {
+  .cpu-details-grid { grid-template-columns: 1fr; }
+}
+
+/* ── External console window (?window=console) ── */
+.console-window {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  height: 100vh;
+  overflow: hidden;
+  background: #0f172a;
+  color: #e2e8f0;
+  font-family: var(--font-ui);
+}
+.console-window-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: #1e293b;
+  border-bottom: 1px solid #334155;
+}
+.console-window-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 700;
+}
+.console-window-live { font-size: 11px; color: #64748b; font-family: var(--font-mono); }
+.console-window-live.on { color: #22c55e; }
+.console-window-body {
+  padding: 12px 14px;
+  overflow-y: auto;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  outline: none;
+}
+.console-window-body .output-placeholder { color: #64748b; font-style: italic; }
+/* Terminal mode: the body takes keyboard focus when the emulator waits for
+   input — focused ring + text cursor make the type-here target obvious. */
+.console-window-body.awaiting-input { cursor: text; }
+.console-window-body.awaiting-input:focus {
+  outline: 1px solid #22c55e;
+  outline-offset: -1px;
+  background: #0c1526;
+}
+.console-window-body .output-text {
+  color: #4ade80;
+  white-space: pre-wrap;
+  line-height: 1.5;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  text-shadow: 0 0 8px rgba(74, 222, 128, 0.5);
+}
+.console-window-body .output-cursor {
+  display: inline-block;
+  width: 8px; height: 14px;
+  background: #4ade80;
+  box-shadow: 0 0 6px rgba(74, 222, 128, 0.8);
+  animation: blink 1s step-end infinite;
+  vertical-align: text-bottom;
+  margin-left: 1px;
+}
+.console-window-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 14px;
+  background: #1e293b;
+  border-top: 1px solid #334155;
+  font-size: 11px;
+  color: #64748b;
+  font-family: var(--font-mono);
+}
+.console-window-footer .clear-btn {
+  background: #334155;
+  border-color: #475569;
+  color: #e2e8f0;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Per-section light color themes + hover magnification + button zoom
+   Each emulator section gets its own pastel identity:
+   registers = sky · flags = green · LED = amber · I/O = violet ·
+   stack = rose · memory = teal · console = slate
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Section color identity = accent stripe + tinted label + card top edge
+   (shared by sidebar sections and CPU Details cards — same hues, one style) */
+.reg-section { --section-accent: #0284c7; border-top: 3px solid #0284c7; }
+.reg-section .sidebar-section-header { background: none; color: #0369a1; }
+.flags-section { --section-accent: #16a34a; border-top: 3px solid #16a34a; }
+.flags-section .sidebar-section-header { background: none; color: #15803d; }
+.led-section { --section-accent: #d97706; border-top: 3px solid #f59e0b; }
+.led-section .sidebar-section-header { background: none; color: #b45309; }
+.io-section { --section-accent: #7c3aed; border-top: 3px solid #8b5cf6; }
+.io-section .sidebar-section-header { background: none; color: #6d28d9; }
+.stack-section { --section-accent: #e11d48; border-top: 3px solid #f43f5e; }
+.stack-section .sidebar-section-header { background: none; color: #be123c; }
+.console-section { --section-accent: #64748b; border-top: 3px solid #94a3b8; }
+.console-section .sidebar-section-header { background: none; color: #475569; }
+
+/* Section-tinted value accents */
+.reg-section .reg-box { border-color: #bae6fd; }
+.reg-section .reg-box:hover { border-color: #0284c7; }
+.io-section .io-input { border-color: #c4b5fd; }
+.io-section .io-input:focus { border-color: #7c3aed; box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.15); }
+.memory-section .goto-controls-bar { background: #f0fdfa; border-color: #99f6e4; }
+.memory-section .mem-addr { color: #0f766e; }
+
+/* CPU Details cards reuse the same hues as their sidebar sections */
+.cpu-details-card[aria-label="Registers"] { --card-accent: #0284c7; }
+.cpu-details-card[aria-label="Registers"] > .cpu-details-card-header { background: none; color: #0369a1; }
+.cpu-details-card[aria-label="Flags"] { --card-accent: #16a34a; }
+.cpu-details-card[aria-label="Flags"] > .cpu-details-card-header { background: none; color: #15803d; }
+.cpu-details-card[aria-label="Stack"] { --card-accent: #e11d48; }
+.cpu-details-card[aria-label="Stack"] > .cpu-details-card-header { background: none; color: #be123c; }
+.cpu-details-card[aria-label="Memory"] { --card-accent: #0d9488; }
+.cpu-details-card[aria-label="Memory"] > .cpu-details-card-header { background: none; color: #0f766e; }
+
+/* ── Hover magnification on text values ── */
+.reg-box { transition: transform var(--transition), box-shadow var(--transition), border-color var(--transition), background-color var(--transition); }
+.reg-box:hover {
+  transform: scale(1.1);
+  box-shadow: 0 2px 8px rgba(2, 132, 199, 0.25);
+  z-index: 1;
+}
+.flag-tile:hover {
+  transform: translateY(-2px) scale(1.06);
+  box-shadow: 0 4px 10px rgba(22, 163, 74, 0.25);
+  border-color: #22c55e;
+  z-index: 1;
+}
+.led-circle:hover { transform: scale(1.25); z-index: 1; }
+.mem-byte:hover {
+  background: #ccfbf1;
+  border-radius: 3px;
+  transform: scale(1.15);
+  z-index: 1;
+}
+.stack-item:hover {
+  background: #ffe4e6;
+  border-radius: 4px;
+  transform: translateX(2px);
+}
+.mem-addr:hover { color: #0d9488; }
+
+/* ── Button magnification: hover zoom, press shrink, live-run pulse ── */
+.btn:not(:disabled):hover { transform: scale(1.07); z-index: 1; }
+.btn:not(:disabled):active { transform: scale(0.95); }
+.btn-help-top:hover { transform: scale(1.07); }
+.btn-help-top:active { transform: scale(0.95); }
+.chip:hover { transform: scale(1.12); }
+.chip.active { transform: scale(1.1); }
+.header-nav-btn:not(.active):hover { transform: scale(1.05); }
+.clear-btn:hover { transform: scale(1.08); }
+
+/* The running Run button magnifies and glows so the live state is obvious */
+.btn-success.is-live {
+  transform: scale(1.1);
+  box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.25), 0 2px 8px rgba(22, 163, 74, 0.4);
+  animation: live-pulse 1.2s ease-in-out infinite;
+}
+@keyframes live-pulse {
+  0%, 100% { box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.25), 0 2px 8px rgba(22, 163, 74, 0.4); }
+  50%      { box-shadow: 0 0 0 6px rgba(22, 163, 74, 0.12), 0 2px 8px rgba(22, 163, 74, 0.4); }
+}
+
+/* ── Status-bar hover hint ── */
+.status-hint {
+  color: var(--text-secondary);
+  font-size: 11.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Reduced motion: honor the OS accessibility setting ── */
+@media (prefers-reduced-motion: reduce) {
+  .running .header-status-dot,
+  .error .header-status-dot,
+  .output-cursor,
+  .console-window-body .output-cursor,
+  .btn-success.is-live,
+  .reg-box.changed,
+  .help-modal {
+    animation: none;
+  }
+}
+
+/* ── Keyboard Input hint (typing happens in the Console window now) ── */
+.input-section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 0;
+  border-top: 1px solid var(--border-color, #333);
+  margin-top: 8px;
+}
+
+.input-section > span:first-child {
+  font-size: 10px;
+  color: var(--text-faint, #888);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.input-section .console-external-note span {
+  text-transform: none;
+  letter-spacing: normal;
+  font-size: 11.5px;
 }

@@ -246,8 +246,18 @@ export class CPU {
 
   step(): Instruction | null {
     if (this.state.halted) return null;
+    const ipBefore = this.state.IP;
     const instr = this.decode();
     if (instr === null) return null;
+    // decode() pre-advances IP past the instruction (fetch semantics), but
+    // execCALL/execINT/execINTO compute the return address as IP + bytes.length
+    // (direct-execute semantics shared with the App/test harnesses). Rewind for
+    // CALL/INT/INTO — the only instructions that read IP — so both paths push
+    // the address of the instruction after the CALL/INT. (JMP/RET/LOOP overwrite
+    // IP, so the pre-advance is harmless for them. INT/INTO always leave IP
+    // past-or-redirected themselves, so the rewind can never strand IP.)
+    const m = instr.mnemonic.toUpperCase();
+    if (m === 'CALL' || m === 'INT' || m === 'INTO') this.state.IP = ipBefore;
     this.execute(instr);
     return instr;
   }
@@ -299,6 +309,36 @@ export class CPU {
     const rSign = result & (bitWidth === 8 ? 0x80 : 0x8000);
     this.setFlag('OF', (aSign !== bSign) && (aSign !== rSign));
     this.setFlag('AF', (a & 0xf) < (b & 0xf));
+    this.updateFlagsSZP(result, bitWidth);
+  }
+
+  // Exact flag computation for ADC (add with carry). Folding the incoming
+  // carry into the operand (updateFlagsAdd(d, s+cf, ...)) gets OF/AF wrong
+  // when the carry itself crosses a nibble/sign boundary (e.g. 7FFF+7FFF+C).
+  updateFlagsAdc(a: number, b: number, carry: number, result: number, bitWidth: 8 | 16): void {
+    const mask = bitWidth === 8 ? 0xff : 0xffff;
+    this.setFlag('CF', a + b + carry > mask);
+    this.setFlag('AF', ((a & 0xf) + (b & 0xf) + carry) > 0xf);
+    const range = bitWidth === 8 ? 256 : 65536;
+    const split = range / 2;
+    const sa = a >= split ? a - range : a;
+    const sb = b >= split ? b - range : b;
+    const trueSum = sa + sb + carry;
+    this.setFlag('OF', trueSum > split - 1 || trueSum < -split);
+    this.updateFlagsSZP(result, bitWidth);
+  }
+
+  // Exact flag computation for SBB (subtract with borrow). Same folding
+  // hazard as ADC (e.g. 8000-7FFF-C mis-reports OF, 10-0F-C mis-reports AF).
+  updateFlagsSbb(a: number, b: number, borrow: number, result: number, bitWidth: 8 | 16): void {
+    this.setFlag('CF', a - b - borrow < 0);
+    this.setFlag('AF', (a & 0xf) < ((b & 0xf) + borrow));
+    const range = bitWidth === 8 ? 256 : 65536;
+    const split = range / 2;
+    const sa = a >= split ? a - range : a;
+    const sb = b >= split ? b - range : b;
+    const trueDiff = sa - sb - borrow;
+    this.setFlag('OF', trueDiff > split - 1 || trueDiff < -split);
     this.updateFlagsSZP(result, bitWidth);
   }
 
@@ -358,7 +398,7 @@ export class CPU {
     const cf = this.getFlag('CF') ? 1 : 0;
     const result = d + s + cf;
     this.writeOperand(dst, result, bw);
-    this.updateFlagsAdd(d, s + cf, result, bw);
+    this.updateFlagsAdc(d, s, cf, result, bw);
     return instr.bytes.length;
   }
 
@@ -381,7 +421,7 @@ export class CPU {
     const cf = this.getFlag('CF') ? 1 : 0;
     const result = d - s - cf;
     this.writeOperand(dst, result, bw);
-    this.updateFlagsSub(d, s + cf, result, bw);
+    this.updateFlagsSbb(d, s, cf, result, bw);
     return instr.bytes.length;
   }
 
@@ -497,12 +537,14 @@ export class CPU {
   }
 
   // SHL/SAL dst, count
+  // True 8086 semantics: the full 8-bit count is used (no 286-style &0x1f
+  // masking), so e.g. SHL AL,CL with CL=32 zeroes AL.
   private execSHL(instr: Instruction): number {
     const dst = instr.operands[0];
     const bw = this.operandBitWidth(dst);
     const mask = bw === 8 ? 0xff : 0xffff;
     const signBit = bw === 8 ? 0x80 : 0x8000;
-    const count = (instr.operands[1] ? this.resolveOperandValue(instr.operands[1], 8) : 1) & 0x1f;
+    const count = (instr.operands[1] ? this.resolveOperandValue(instr.operands[1], 8) : 1) & 0xff;
     let result = this.resolveOperandValue(dst, bw) & mask;
     let cf = false;
     const origMSB = (result & signBit) !== 0;
@@ -520,13 +562,13 @@ export class CPU {
     return instr.bytes.length;
   }
 
-  // SHR (logical)
+  // SHR (logical) — full 8-bit count, like the 8086 (see execSHL note)
   private execSHR(instr: Instruction): number {
     const dst = instr.operands[0];
     const bw = this.operandBitWidth(dst);
     const mask = bw === 8 ? 0xff : 0xffff;
     const signBit = bw === 8 ? 0x80 : 0x8000;
-    const count = (instr.operands[1] ? this.resolveOperandValue(instr.operands[1], 8) : 1) & 0x1f;
+    const count = (instr.operands[1] ? this.resolveOperandValue(instr.operands[1], 8) : 1) & 0xff;
     let result = this.resolveOperandValue(dst, bw) & mask;
     const origMSB = (result & signBit) !== 0;
     let cf = false;
@@ -544,13 +586,13 @@ export class CPU {
     return instr.bytes.length;
   }
 
-  // SAR (arithmetic shift right — sign extends)
+  // SAR (arithmetic shift right — sign extends). Full count, like execSHL.
   private execSAR(instr: Instruction): number {
     const dst = instr.operands[0];
     const bw = this.operandBitWidth(dst);
     const mask = bw === 8 ? 0xff : 0xffff;
     const signBit = bw === 8 ? 0x80 : 0x8000;
-    const count = (instr.operands[1] ? this.resolveOperandValue(instr.operands[1], 8) : 1) & 0x1f;
+    const count = (instr.operands[1] ? this.resolveOperandValue(instr.operands[1], 8) : 1) & 0xff;
     let result = this.resolveOperandValue(dst, bw) & mask;
     // sign-extend to JS number
     if (bw === 8 && (result & 0x80)) result = result | ~0xff;
@@ -570,23 +612,28 @@ export class CPU {
     return instr.bytes.length;
   }
 
-  // ROL — rotate left
+  // ROL — rotate left. Pure rotates repeat every `bits`, so count%bits is
+  // exact on every generation; the flag guard keys on the raw count (0 = no-op).
   private execROL(instr: Instruction): number {
     const dst = instr.operands[0];
     const bw = this.operandBitWidth(dst);
     const bits = bw;
     const mask = bw === 8 ? 0xff : 0xffff;
     const signBit = bw === 8 ? 0x80 : 0x8000;
-    const count = ((instr.operands[1] ? this.resolveOperandValue(instr.operands[1], 8) : 1) & 0x1f) % bits;
+    const rawCount = instr.operands[1] ? this.resolveOperandValue(instr.operands[1], 8) : 1;
+    const count = rawCount % bits;
     let result = this.resolveOperandValue(dst, bw) & mask;
     for (let i = 0; i < count; i++) {
       const msb = (result & signBit) ? 1 : 0;
       result = ((result << 1) | msb) & mask;
     }
     this.writeOperand(dst, result, bw);
-    const newCF = (result & 1) !== 0; // low bit after rotate = old MSB
-    this.setFlag('CF', newCF);
-    this.setFlag('OF', count === 1 ? newCF !== ((result & signBit) !== 0) : false);
+    // Count 0 leaves flags untouched, like SHL/SHR/SAR.
+    if (rawCount !== 0) {
+      const newCF = (result & 1) !== 0; // low bit after rotate = old MSB
+      this.setFlag('CF', newCF);
+      this.setFlag('OF', count === 1 ? newCF !== ((result & signBit) !== 0) : false);
+    }
     return instr.bytes.length;
   }
 
@@ -597,26 +644,29 @@ export class CPU {
     const bits = bw;
     const mask = bw === 8 ? 0xff : 0xffff;
     const signBit = bw === 8 ? 0x80 : 0x8000;
-    const count = ((instr.operands[1] ? this.resolveOperandValue(instr.operands[1], 8) : 1) & 0x1f) % bits;
+    const rawCount = instr.operands[1] ? this.resolveOperandValue(instr.operands[1], 8) : 1;
+    const count = rawCount % bits;
     let result = this.resolveOperandValue(dst, bw) & mask;
     for (let i = 0; i < count; i++) {
       const lsb = result & 1;
       result = ((result >>> 1) | (lsb ? signBit : 0)) & mask;
     }
     this.writeOperand(dst, result, bw);
-    const newCF = (result & signBit) !== 0;
-    this.setFlag('CF', newCF);
-    this.setFlag('OF', count === 1 ? ((result & signBit) !== 0) !== ((result & (signBit >> 1)) !== 0) : false);
+    if (rawCount !== 0) {
+      const newCF = (result & signBit) !== 0;
+      this.setFlag('CF', newCF);
+      this.setFlag('OF', count === 1 ? ((result & signBit) !== 0) !== ((result & (signBit >> 1)) !== 0) : false);
+    }
     return instr.bytes.length;
   }
 
-  // RCL — rotate left through carry
+  // RCL — rotate left through carry. Full 8-bit count (period bits+1).
   private execRCL(instr: Instruction): number {
     const dst = instr.operands[0];
     const bw = this.operandBitWidth(dst);
     const mask = bw === 8 ? 0xff : 0xffff;
     const signBit = bw === 8 ? 0x80 : 0x8000;
-    const count = (instr.operands[1] ? this.resolveOperandValue(instr.operands[1], 8) : 1) & 0x1f;
+    const count = (instr.operands[1] ? this.resolveOperandValue(instr.operands[1], 8) : 1) & 0xff;
     let result = this.resolveOperandValue(dst, bw) & mask;
     let cf = this.getFlag('CF');
     for (let i = 0; i < count; i++) {
@@ -625,18 +675,20 @@ export class CPU {
       cf = newCF;
     }
     this.writeOperand(dst, result, bw);
-    this.setFlag('CF', cf);
-    this.setFlag('OF', count === 1 ? cf !== ((result & signBit) !== 0) : false);
+    if (count !== 0) {
+      this.setFlag('CF', cf);
+      this.setFlag('OF', count === 1 ? cf !== ((result & signBit) !== 0) : false);
+    }
     return instr.bytes.length;
   }
 
-  // RCR — rotate right through carry
+  // RCR — rotate right through carry. Full 8-bit count (period bits+1).
   private execRCR(instr: Instruction): number {
     const dst = instr.operands[0];
     const bw = this.operandBitWidth(dst);
     const mask = bw === 8 ? 0xff : 0xffff;
     const signBit = bw === 8 ? 0x80 : 0x8000;
-    const count = (instr.operands[1] ? this.resolveOperandValue(instr.operands[1], 8) : 1) & 0x1f;
+    const count = (instr.operands[1] ? this.resolveOperandValue(instr.operands[1], 8) : 1) & 0xff;
     let result = this.resolveOperandValue(dst, bw) & mask;
     let cf = this.getFlag('CF');
     for (let i = 0; i < count; i++) {
@@ -645,8 +697,13 @@ export class CPU {
       cf = newCF;
     }
     this.writeOperand(dst, result, bw);
-    this.setFlag('CF', cf);
-    this.setFlag('OF', count === 1 ? ((result & signBit) !== 0) !== (((result >> 1) & (signBit >> 1)) !== 0) : false);
+    if (count !== 0) {
+      this.setFlag('CF', cf);
+      // OF = MSB XOR second-MSB of the result (count=1). Note: this must
+      // read bit (signBit>>1) of the result itself — shifting the result
+      // right first compares the MSB against itself and yields OF=0 always.
+      this.setFlag('OF', count === 1 ? ((result & signBit) !== 0) !== ((result & (signBit >> 1)) !== 0) : false);
+    }
     return instr.bytes.length;
   }
 
@@ -711,14 +768,22 @@ export class CPU {
       const dividend = this.state.AX & 0xffff;
       const quotient = Math.floor(dividend / s);
       const remainder = dividend % s;
-      if (quotient > 0xff) throw new Error('Division overflow');
+      if (quotient > 0xff) {
+        this.state.error = 'Division overflow';
+        this.state.halted = true;
+        throw new Error('Division overflow');
+      }
       this.state.AX = ((remainder & 0xff) << 8) | (quotient & 0xff);
     } else {
       const dx = this.readRegister16('DX');
       const dividend = (dx * 0x10000) + this.state.AX;
       const quotient = Math.floor(dividend / s);
       const remainder = dividend % s;
-      if (quotient > 0xffff) throw new Error('Division overflow');
+      if (quotient > 0xffff) {
+        this.state.error = 'Division overflow';
+        this.state.halted = true;
+        throw new Error('Division overflow');
+      }
       this.state.AX = quotient & 0xffff;
       this.writeRegister('DX', remainder & 0xffff);
     }
@@ -740,7 +805,11 @@ export class CPU {
       const dividend = ax >= 0x8000 ? ax - 65536 : ax;
       const quotient = Math.trunc(dividend / s);
       const remainder = dividend % s;
-      if (quotient > 127 || quotient < -128) throw new Error('Division overflow');
+      if (quotient > 127 || quotient < -128) {
+        this.state.error = 'Division overflow';
+        this.state.halted = true;
+        throw new Error('Division overflow');
+      }
       this.state.AX = ((remainder & 0xff) << 8) | (quotient & 0xff);
     } else {
       const dx = this.readRegister16('DX');
@@ -749,7 +818,11 @@ export class CPU {
       if (dx >= 0x8000) dividend -= 0x100000000;
       const quotient = Math.trunc(dividend / s);
       const remainder = dividend % s;
-      if (quotient > 32767 || quotient < -32768) throw new Error('Division overflow');
+      if (quotient > 32767 || quotient < -32768) {
+        this.state.error = 'Division overflow';
+        this.state.halted = true;
+        throw new Error('Division overflow');
+      }
       this.state.AX = quotient & 0xffff;
       this.writeRegister('DX', remainder & 0xffff);
     }
@@ -798,9 +871,15 @@ export class CPU {
     return 1;
   }
 
-  // AAM — ASCII adjust after multiply (optional base operand, default 10)
+  // AAM — ASCII adjust after multiply (optional base operand, default 10).
+  // An explicit base of 0 is a divide error on real hardware.
   private execAAM(instr: Instruction): number {
-    const base = instr.operands.length > 0 ? (this.resolveOperandValue(instr.operands[0], 8) || 10) : 10;
+    const base = instr.operands.length > 0 ? this.resolveOperandValue(instr.operands[0], 8) : 10;
+    if (base === 0) {
+      this.state.error = 'Division by zero';
+      this.state.halted = true;
+      throw new Error('Division by zero');
+    }
     const al = this.state.AX & 0xff;
     const ah = Math.floor(al / base);
     const newAl = al % base;
@@ -809,9 +888,15 @@ export class CPU {
     return 1;
   }
 
-  // AAD — ASCII adjust before division (optional base operand, default 10)
+  // AAD — ASCII adjust before division (optional base operand, default 10).
+  // An explicit base of 0 is a divide error on real hardware.
   private execAAD(instr: Instruction): number {
-    const base = instr.operands.length > 0 ? (this.resolveOperandValue(instr.operands[0], 8) || 10) : 10;
+    const base = instr.operands.length > 0 ? this.resolveOperandValue(instr.operands[0], 8) : 10;
+    if (base === 0) {
+      this.state.error = 'Division by zero';
+      this.state.halted = true;
+      throw new Error('Division by zero');
+    }
     const ah = (this.state.AX >> 8) & 0xff;
     const al = this.state.AX & 0xff;
     const result = (al + ah * base) & 0xff;
@@ -1268,15 +1353,49 @@ export class CPU {
 
   private execINT(instr: Instruction): number {
     const vector = instr.operands[0]?.value ?? 0;
-    if (this.interruptHandler) {
+    // Serviced OS vectors (DOS/BIOS) run as synchronous traps with unchanged
+    // behavior: the handler executes inline and control continues after the
+    // INT. IP is advanced explicitly so the direct-execute() and step() paths
+    // agree (the harness skips its manual advance when IP already moved).
+    if (this.interruptHandler && (vector === 0x20 || vector === 0x21 || vector === 0x16)) {
       this.interruptHandler(this, vector);
+      this.state.IP = (this.state.IP + instr.bytes.length) & 0xffff;
+      return instr.bytes.length;
     }
+    // All other vectors: a genuine 8086 hardware interrupt — push FLAGS, CS
+    // and the return address, clear TF/IF, and jump through the vector table
+    // at physical 0000:4n. IRET pops IP/CS/FLAGS to return to the next
+    // instruction. (Requires step()'s IP rewind above in the decode path.)
+    this.hardwareInterrupt(vector, instr.bytes.length);
     return instr.bytes.length;
   }
 
+  // Shared hardware-interrupt core for INT n (unserviced vectors) and INTO.
+  // instrLen is the length of the triggering instruction, used for the pushed
+  // return address — exactly like execCALL's retAddr.
+  private hardwareInterrupt(vector: number, instrLen: number): void {
+    const retIP = (this.state.IP + instrLen) & 0xffff;
+    this.state.SP = (this.state.SP - 2) & 0xffff;
+    this.memory.write16(physicalAddress(this.state.SS, this.state.SP), this.state.FLAGS & 0xffff);
+    this.state.SP = (this.state.SP - 2) & 0xffff;
+    this.memory.write16(physicalAddress(this.state.SS, this.state.SP), this.state.CS);
+    this.state.SP = (this.state.SP - 2) & 0xffff;
+    this.memory.write16(physicalAddress(this.state.SS, this.state.SP), retIP);
+    this.setFlag('TF', false);
+    this.setFlag('IF', false);
+    const vec = (vector & 0xff) * 4;
+    this.state.IP = this.memory.read16(vec);
+    this.state.CS = this.memory.read16(vec + 2);
+  }
+
   private execINTO(_instr: Instruction): number {
-    if (this.getFlag('OF') && this.interruptHandler) {
-      this.interruptHandler(this, 4);
+    // Overflow trap = hardware INT 4 when OF is set; otherwise a 1-byte no-op
+    // that still advances IP itself (see step() rewind contract above).
+    if (this.getFlag('OF')) {
+      if (this.interruptHandler) this.interruptHandler(this, 4);
+      this.hardwareInterrupt(4, 1);
+    } else {
+      this.state.IP = (this.state.IP + 1) & 0xffff;
     }
     return 1;
   }

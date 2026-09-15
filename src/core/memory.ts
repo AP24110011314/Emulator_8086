@@ -31,11 +31,12 @@ export class Memory {
     return this.data[address] || 0;
   }
 
-  // Read a word at a physical address (little-endian)
+  // Read a word at a physical address (little-endian).
+  // Like real hardware, the second byte wraps at the 1MB boundary:
+  // read16(0xFFFFF) reads 0xFFFFF and 0x00000.
   read16(address: number): number {
     this.validateAddress(address);
-    this.validateAddress(address + 1);
-    return (this.data[address] | (this.data[address + 1] << 8)) & 0xffff;
+    return (this.data[address] | (this.data[(address + 1) & (MEMORY_SIZE - 1)] << 8)) & 0xffff;
   }
 
   // Write a byte to a physical address
@@ -44,12 +45,11 @@ export class Memory {
     this.data[address] = value & 0xff;
   }
 
-  // Write a word to a physical address (little-endian)
+  // Write a word to a physical address (little-endian, wrapping like read16)
   write16(address: number, value: number): void {
     this.validateAddress(address);
-    this.validateAddress(address + 1);
     this.data[address] = value & 0xff;
-    this.data[address + 1] = (value >>> 8) & 0xff;
+    this.data[(address + 1) & (MEMORY_SIZE - 1)] = (value >>> 8) & 0xff;
   }
 
   // Read a byte at a segment:offset address

@@ -6,9 +6,11 @@ interface StackPanelProps {
   cpu: CPU | null;
   cpuState: CPUState | null;
   initialSP?: number;
+  /** Render content only (no section wrapper/header) when nested in a card that has its own heading. */
+  bare?: boolean;
 }
 
-export function StackPanel({ cpu, cpuState, initialSP = 0x0100 }: StackPanelProps) {
+export function StackPanel({ cpu, cpuState, initialSP = 0x0100, bare }: StackPanelProps) {
   // If no CPU or SP has not decremented below initialSP, stack is empty
   const isEmpty = !cpuState || !cpu || cpuState.SP >= initialSP;
 
@@ -26,8 +28,8 @@ export function StackPanel({ cpu, cpuState, initialSP = 0x0100 }: StackPanelProp
   }
 
   return (
-    <div className="sidebar-section stack-section">
-      <div className="sidebar-section-header">STACK</div>
+    <div className={`sidebar-section stack-section${bare ? ' bare' : ''}`}>
+      {!bare && <div className="sidebar-section-header">STACK</div>}
       <div className="stack-content">
         {isEmpty ? (
           <div className="stack-empty">Stack is empty</div>

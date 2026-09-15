@@ -555,6 +555,28 @@ Expected: assembler correctly resolves `message`/`count`/`buffer` labels
 to addresses, expands `20 DUP(0)` into 20 zero bytes, substitutes `MAX`
 with `100` wherever used, and treats `END start` as program entry point.
 
+### 8.1 Label arithmetic (`OFFSET NAME + 2`)
+
+Operands support `label + constant` and `label - constant` (spacing around
+the operator is insignificant), both bare and with `OFFSET`, plus inside
+`[...]` memory references. This is the standard MASM idiom for reaching
+into a DOS `INT 21h AH=0Ah` input buffer past its max-length and
+actual-length bytes:
+
+```asm
+.DATA
+NAME DB 20
+     DB ?
+     DB 20 DUP('$')
+.CODE
+MOV DX, OFFSET NAME + 2
+HLT
+```
+Expected: `DX` = address of `NAME` + 2 (no "Undefined label" error).
+Covered by the "Label arithmetic in operands" tests in
+`tests/core/user_reported.test.ts` (spacing variants, bare form,
+subtraction, `[NAME + 2]` byte read, undefined-label errors preserved).
+
 ---
 
 ## 9. Full Integration Programs

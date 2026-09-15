@@ -10,7 +10,7 @@ interface RunResult {
   error?: Error;
 }
 
-function runSnippet(code: string, opts?: { ioHandler?: any; maxSteps?: number }): RunResult {
+function runSnippet(code: string, opts?: { ioHandler?: any; maxSteps?: number; preload?: Array<{ address: number; bytes: number[] }> }): RunResult {
   const asmResult = assemble(code);
   if (asmResult.errors.length > 0) {
     throw new Error(`Assembly failed: ${asmResult.errors[0].message} (line ${asmResult.errors[0].line})`);
@@ -37,6 +37,14 @@ function runSnippet(code: string, opts?: { ioHandler?: any; maxSteps?: number })
     const dataBase = dataSeg << 4;
     for (let i = 0; i < asmResult.dataBytes.length; i++) {
       cpu.writePhysical8(dataBase + i, asmResult.dataBytes[i]);
+    }
+  }
+
+  // Explicit test-setup memory preload (physical addresses), applied after
+  // code/data loading and before execution.
+  if (opts?.preload) {
+    for (const region of opts.preload) {
+      region.bytes.forEach((b, i) => cpu.writePhysical8(region.address + i, b));
     }
   }
 
@@ -666,22 +674,138 @@ describe('8086_TEST_SUITE.md Full Suite', () => {
       expect(cpu.getState().SP).toBe(0xFFFE);
     });
 
-    it('4.8 INT / IRET with flags preserved', () => {
-      let intInvoked = false;
-      const code = `
-        MOV AX, 1234h
-        INT 21h
-        HLT
-      `;
-      const { cpu } = runSnippet(code, {
-        ioHandler: {
-          writeChar: () => {},
-          readChar: () => null
-        }
+     it('4.8 INT / IRET with flags preserved', () => {
+       let intInvoked = false;
+       const code = `
+         MOV AX, 1234h
+         INT 21h
+         HLT
+       `;
+       const { cpu } = runSnippet(code, {
+         ioHandler: {
+           writeChar: () => {},
+           readChar: () => null
+         }
+       });
+       expect(cpu.getState().AX).toBe(0x1234);
+     });
+
+     it('4.9 INT 21h AH=02h — print character', () => {
+       let output = '';
+       const code = `
+         MOV AH, 02h
+         MOV DL, 'X'
+         INT 21h
+         MOV AH, 4Ch
+         INT 21h
+       `;
+       const { cpu } = runSnippet(code, {
+         ioHandler: { writeChar: (c: string) => { output += c; }, readChar: () => null }
+       });
+       expect(output).toBe('X');
+       expect(cpu.getState().halted).toBe(true);
+     });
+
+     it('4.10 INT 21h AH=09h — print string', () => {
+       let output = '';
+       const code = `
+         ORG 100h
+         msg DB 'Hi$'
+         MOV AH, 09h
+         MOV DX, msg
+         INT 21h
+         MOV AH, 4Ch
+         INT 21h
+       `;
+       const { cpu } = runSnippet(code, {
+         ioHandler: { writeChar: (c: string) => { output += c; }, readChar: () => null }
+       });
+       expect(output).toBe('Hi');
+       expect(cpu.getState().halted).toBe(true);
+     });
+
+     it('4.11 INT 21h AH=01h — read character', () => {
+       const code = `
+         MOV AH, 01h
+         INT 21h
+         MOV AH, 4Ch
+         INT 21h
+       `;
+       const { cpu } = runSnippet(code, {
+         ioHandler: { writeChar: () => {}, readChar: () => 'A' }
+       });
+       expect(cpu.readRegister8('AL')).toBe('A'.charCodeAt(0));
+     });
+
+     it('4.12 INT 16h — read keystroke', () => {
+       let output = '';
+       const code = `
+         MOV AH, 00h
+         INT 16h
+         MOV AH, 02h
+         MOV DL, AL
+         INT 21h
+         MOV AH, 4Ch
+         INT 21h
+       `;
+       const { cpu } = runSnippet(code, {
+         ioHandler: { writeChar: (c: string) => { output += c; }, readChar: () => 'Z' }
+       });
+       expect(output).toBe('Z');
+     });
+
+      it('4.13 INT 21h AH=0Ah — buffered string input', () => {
+        let output = '';
+        const code = `
+          ORG 100h
+          buf DB 20, 0, 20 DUP('$')
+          MOV AH, 0Ah
+          MOV DX, buf
+          INT 21h
+          MOV AH, 09h
+          MOV DX, buf+2
+          INT 21h
+          MOV AH, 4Ch
+          INT 21h
+        `;
+        const { cpu } = runSnippet(code, {
+          ioHandler: { writeChar: (c: string) => { output += c; }, readChar: () => null, readLine: () => 'Hi' }
+        });
+        // AH=0Ah echoes the line, then the program prints it again via AH=09h
+        // (which stops at the untouched '$' fill).
+        expect(output).toBe('HiHi');
+        expect(cpu.readPhysical8(0x101)).toBe(2); // actual count at buf+1
+        expect(cpu.readPhysical8(0x102)).toBe('H'.charCodeAt(0));
+        expect(cpu.readPhysical8(0x103)).toBe('i'.charCodeAt(0));
+        expect(cpu.readPhysical8(0x104)).toBe('$'.charCodeAt(0)); // tail untouched
       });
-      expect(cpu.getState().AX).toBe(0x1234);
-    });
-  });
+
+     it('4.14 Max-finder over memory (CMP AL,[SI] / JAE loop)', () => {
+       // User-reported max-finder shape: the loop logic is exercised here with
+       // memory EXPLICITLY pre-loaded as test setup. Without pre-loaded data
+       // (DS:0000 all zeros) the same program yields AL=00H — a setup issue,
+       // not a CMP/JAE bug (verified by hand-trace: CF/ZF correct each iter).
+       const code = `
+         ORG 100h
+         MOV SI, 0000H
+         MOV AL, [SI]
+         MOV CX, 0004H
+         INC SI
+       NEXT:
+         CMP AL, [SI]
+         JAE SKIP
+         MOV AL, [SI]
+       SKIP:
+         INC SI
+         LOOP NEXT
+         HLT
+       `;
+       const { cpu } = runSnippet(code, {
+         preload: [{ address: 0x00000, bytes: [0x03, 0x09, 0x02, 0x07, 0x05] }]
+       });
+       expect(cpu.readRegister8('AL')).toBe(0x09);
+     });
+   });
 
   // ─── 5. String Instructions ─────────────────────────────────────────────────
   describe('5. String Instructions', () => {

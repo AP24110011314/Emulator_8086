@@ -115,6 +115,7 @@ export function MemoryViewer({ cpu, cpuState, baseAddress, onBaseChange }: Memor
                   key={i}
                   className={`mem-byte ${b !== 0 ? 'active' : ''}`}
                   id={`mem-${(rowAddr + i).toString(16)}`}
+                  title={`0x${(rowAddr + i).toString(16).toUpperCase().padStart(5, '0')} — ${b.toString(16).toUpperCase().padStart(2, '0')}h (${b})`}
                 >
                   {b.toString(16).toUpperCase().padStart(2, '0')}
                 </span>

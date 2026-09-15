@@ -28,6 +28,35 @@ SUM_LOOP:
         HLT                 ; Done — AX = 10`
   },
   {
+    id: 'find_max',
+    name: 'Find Maximum',
+    description: 'Largest value in a byte array. Result in AL.',
+    code: `; Find Maximum — largest number in an array
+; Demonstrates: DB data, OFFSET, [SI] addressing, CMP, JAE, LOOP
+; Result: AL = 09H (largest of 3, 9, 2, 7, 5)
+;
+; NOTE: the array MUST be defined with DB. [SI] reads real memory, so
+; pointing SI at code (e.g. MOV SI, 0000H with no data) scans the
+; program's own bytes and gives a meaningless result.
+
+        ORG 100h
+arr     DB 3, 9, 2, 7, 5
+        MOV  CX, 4          ; 4 comparisons for 5 elements
+        MOV  SI, OFFSET arr
+        MOV  AL, [SI]       ; AL = first element
+
+NEXT:
+        INC  SI
+        CMP  AL, [SI]
+        JAE  SKIP           ; AL >= [SI]? keep current maximum
+        MOV  AL, [SI]       ; new maximum found
+
+SKIP:
+        LOOP NEXT
+
+        HLT                 ; Done — AL = 09H`
+  },
+  {
     id: 'fibonacci',
     name: 'Fibonacci',
     description: 'Computes Fibonacci numbers. Final: AX=13, BX=8.',
@@ -94,6 +123,43 @@ COUNTDOWN:
     INT  21h            ; DOS interrupt
 
     MOV  AH, 4Ch        ; Service 4Ch: exit to DOS
+    INT  21h`
+  },
+  {
+    id: 'name_input',
+    name: 'Name Input',
+    description: 'Reads your name in the Console window (INT 21h AH=0Ah) and greets you.',
+    code: `; Name Input — type in the Console window, see a live cursor
+; Demonstrates: INT 21h AH=09h (print), AH=0Ah (buffered keyboard input)
+; Run, then click the Console window, type a name, press Enter.
+.DATA
+PROMPT DB 'Enter your name: $'
+NAMEBUF DB 20
+        DB ?
+        DB 20 DUP('$')
+GREET DB 0Dh, 0Ah, 'Hello, $'
+
+.CODE
+    MOV  AX, @DATA
+    MOV  DS, AX          ; DS -> data segment
+
+    MOV  AH, 09h
+    MOV  DX, OFFSET PROMPT
+    INT  21h             ; Print 'Enter your name: '
+
+    MOV  AH, 0Ah
+    MOV  DX, OFFSET NAMEBUF
+    INT  21h             ; Read name (cursor blinks in the Console)
+
+    MOV  AH, 09h
+    MOV  DX, OFFSET GREET
+    INT  21h             ; Newline + 'Hello, '
+
+    MOV  AH, 09h
+    MOV  DX, OFFSET NAMEBUF + 2
+    INT  21h             ; Print the typed name (stops at '$' fill)
+
+    MOV  AH, 4Ch
     INT  21h`
   },
   {

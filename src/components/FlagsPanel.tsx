@@ -4,6 +4,8 @@ import { CPUState, FLAG_BITS, FlagName } from '../core/types';
 interface FlagsPanelProps {
   cpuState: CPUState | null;
   prevState: CPUState | null;
+  /** Render content only (no section wrapper/header) when nested in a card that has its own heading. */
+  bare?: boolean;
 }
 
 interface FlagInfo {
@@ -26,13 +28,13 @@ function getFlag(flags: number, name: FlagName): boolean {
   return (flags & (1 << FLAG_BITS[name])) !== 0;
 }
 
-export function FlagsPanel({ cpuState, prevState }: FlagsPanelProps) {
+export function FlagsPanel({ cpuState, prevState, bare }: FlagsPanelProps) {
   const flags = cpuState ? cpuState.FLAGS : 0;
   const prevFlags = prevState ? prevState.FLAGS : flags;
 
   return (
-    <div className="sidebar-section flags-section">
-      <div className="sidebar-section-header">FLAGS</div>
+    <div className={`sidebar-section flags-section${bare ? ' bare' : ''}`}>
+      {!bare && <div className="sidebar-section-header">FLAGS</div>}
       <div className="flags-row">
         {FLAGS_LIST.map(({ name, label, description }) => {
           const isSet = getFlag(flags, name);

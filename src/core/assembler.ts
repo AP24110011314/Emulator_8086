@@ -178,6 +178,25 @@ function parseImmediate(s: string): number | null {
   return null;
 }
 
+// ─── Label arithmetic (e.g. `NAME + 2`, `ARR-1`) ─────────────────────────────
+// Standard MASM idiom: label ± constant resolves to (label address ± constant),
+// e.g. `MOV DX, OFFSET NAME + 2` skips a DOS input buffer's max-length and
+// actual-length bytes to reach the string data. Spacing around the operator
+// is insignificant (`NAME+2`, `NAME + 2`, `NAME +2` all parse identically).
+// The constant goes through parseImmediate, so hex (`+ 0FFH`) etc. work too.
+function resolveLabelArithmetic(
+  expr: string,
+  labels: Map<string, number>
+): { value: number } | { unknownLabel: string } | null {
+  const m = expr.match(/^([@A-Za-z_][A-Za-z0-9_]*)\s*([+-])\s*(.+)$/);
+  if (!m) return null;
+  const base = labels.get(m[1].toUpperCase());
+  if (base === undefined) return { unknownLabel: m[1] };
+  const c = parseImmediate(m[3].trim());
+  if (c === null) return null;
+  return { value: m[2] === '+' ? (base + c) & 0xffff : (base - c) & 0xffff };
+}
+
 // ─── Operand parsing ──────────────────────────────────────────────────────────
 
 function parseOperand(raw: string, labels: Map<string, number>): Operand | null {
@@ -207,13 +226,18 @@ function parseOperand(raw: string, labels: Map<string, number>): Operand | null 
     return { type: 'register', register: r as any, size: sizeOverride };
   }
 
-  // OFFSET <label> keyword
+  // OFFSET <label> keyword (also <label> +/- constant, e.g. OFFSET NAME + 2)
   const offsetMatch = inner.match(/^OFFSET\s+(.+)$/i);
   if (offsetMatch) {
-    const lbl = offsetMatch[1].trim().toUpperCase();
-    const addr = labels.get(lbl);
+    const expr = offsetMatch[1].trim();
+    const addr = labels.get(expr.toUpperCase());
     if (addr !== undefined) return { type: 'immediate', value: addr };
-    return { type: 'immediate', value: 0, register: lbl as any };
+    const arith = resolveLabelArithmetic(expr, labels);
+    if (arith !== null) {
+      if ('value' in arith) return { type: 'immediate', value: arith.value };
+      return { type: 'immediate', value: 0, register: arith.unknownLabel as any };
+    }
+    return { type: 'immediate', value: 0, register: expr.toUpperCase() as any };
   }
 
   // SEG <label> keyword
@@ -243,6 +267,14 @@ function parseOperand(raw: string, labels: Map<string, number>): Operand | null 
     return { type: 'immediate', value: 0, register: inner as any };
   }
 
+  // Bare label arithmetic without OFFSET: `MOV DX, NAME + 2`
+  // ([...] brackets already tokenise +/- in parseMemoryOperand.)
+  const bareArith = resolveLabelArithmetic(inner, labels);
+  if (bareArith !== null) {
+    if ('value' in bareArith) return { type: 'immediate', value: bareArith.value };
+    return { type: 'immediate', value: 0, register: bareArith.unknownLabel as any };
+  }
+
   return null;
 }
 
@@ -253,6 +285,9 @@ function parseMemoryOperand(inner: string, labels: Map<string, number>, segmentO
   if (segMatch) {
     segmentStr = segMatch[1].toUpperCase();
     inner = segMatch[2].trim();
+  }
+  if (segmentStr !== undefined && !/^(CS|DS|ES|SS)$/.test(segmentStr)) {
+    throw new Error(`Unknown segment register: "${segmentStr}"`);
   }
 
   // Tokenise: split on + and -, keeping sign
@@ -269,6 +304,7 @@ function parseMemoryOperand(inner: string, labels: Map<string, number>, segmentO
   let offset = 0;
 
   for (const tok of tokens) {
+    if (!tok.value) continue;
     const v = tok.value.toUpperCase();
     if (isReg(v)) {
       if (!base) base = v;
@@ -281,6 +317,10 @@ function parseMemoryOperand(inner: string, labels: Map<string, number>, segmentO
         const lblVal = labels.get(v);
         if (lblVal !== undefined) {
           offset = (offset + tok.sign * lblVal) & 0xffff;
+        } else {
+          // Unknown identifier inside brackets used to assemble silently as
+          // [0] — report it so it can't masquerade as a valid address.
+          throw new Error(`Undefined label: "${tok.value}"`);
         }
       }
     }
@@ -320,11 +360,19 @@ const DATA_SEGMENT_PARAGRAPH = 0x1000;
  * e.g. "10 DUP(0)" → "0,0,..." or "10h DUP(?)" → "0,0,..."
  */
 function expandDup(args: string): string {
-  return args.replace(/([0-9a-fA-F]+h?|\d+)\s+DUP\s*\(([^)]+)\)/gi, (_m, countStr, val) => {
-    const count = parseImmediate(countStr) ?? parseInt(countStr, 10) ?? 1;
-    const cleanVal = val.trim() === '?' ? '0' : val.trim();
-    return Array(Math.max(0, count)).fill(cleanVal).join(',');
-  });
+  // Loop until fixpoint so nested DUP (e.g. `2 DUP(3 DUP(7))`) expands fully:
+  // each pass expands the innermost DUP whose (...) contains no parens.
+  let prev = args;
+  for (let pass = 0; pass < 10; pass++) {
+    const next = prev.replace(/([0-9a-fA-F]+h?|\d+)\s+DUP\s*\(([^()]+)\)/gi, (_m, countStr, val) => {
+      const count = parseImmediate(countStr) ?? parseInt(countStr, 10) ?? 1;
+      const cleanVal = val.trim() === '?' ? '0' : val.trim();
+      return Array(Math.max(0, count)).fill(cleanVal).join(',');
+    });
+    if (next === prev) return next;
+    prev = next;
+  }
+  return prev;
 }
 
 function parseDbArgs(args: string): number[] {
@@ -694,7 +742,16 @@ function buildInstruction(
   }
 
   for (const os of operandStrings) {
-    const op = parseOperand(os, labels);
+    let op: Operand | null;
+    try {
+      op = parseOperand(os, labels);
+    } catch (e: unknown) {
+      // parseMemoryOperand throws precise errors (undefined label inside
+      // [...], bad segment override) — surface them instead of a generic
+      // "cannot parse" message.
+      errors.push({ line: lineNum, message: e instanceof Error ? e.message : String(e) });
+      return null;
+    }
     if (op === null) {
       errors.push({ line: lineNum, message: `Cannot parse operand: "${os}"` });
       return null;
@@ -729,6 +786,13 @@ function buildInstruction(
 }
 
 // ─── Opcode lookup ────────────────────────────────────────────────────────────
+// CONTRACT (execution model): `bytes` are NOT fetchable machine code — only
+// bytes[0] (base-opcode hint, used by the MemoryViewer) and bytes.length (used
+// for IP advance) are meaningful. Operand bytes (ModRM, immediates,
+// displacements, rel offsets) are left as zeros. Programs run by dispatching
+// decoded operands via cpu.execute(), never via decode()/step() on these
+// bytes. A real encoder (ModRM + label-rel fixups) is a separate project;
+// until then, decode()/step() tests must hand-encode with loadAndJump().
 
 function opcodeFor(mnemonic: string, _ops: Operand[]): number {
   const map: Record<string, number> = {
