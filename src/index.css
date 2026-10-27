@@ -1033,12 +1033,18 @@ html, body, #root {
   border: 1px solid #334155;
   border-radius: 6px;
   padding: 8px 10px;
-  min-height: 70px;
-  max-height: 120px;
+  min-height: 80px;
+  max-height: 150px;
   overflow-y: auto;
   font-family: var(--font-mono);
   font-size: 12px;
   box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.25);
+  transition: border-color var(--transition);
+}
+
+.output-body.awaiting-input {
+  border-color: #0284c7;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(2, 132, 199, 0.4);
 }
 
 .output-placeholder {
@@ -1067,6 +1073,67 @@ html, body, #root {
   margin-left: 2px;
 }
 @keyframes blink { 50% { opacity: 0; } }
+
+/* ── Inline Console Input ── */
+.inline-input-container {
+  margin-top: 8px;
+  background: #f0f9ff;
+  border: 1px solid #bae6fd;
+  border-radius: var(--radius-md);
+  padding: 8px 10px;
+}
+
+.inline-input-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #0369a1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.inline-input-pulse {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #0284c7;
+  box-shadow: 0 0 6px rgba(2, 132, 199, 0.7);
+  animation: pulse-dot 1.2s ease-in-out infinite alternate;
+}
+
+@keyframes pulse-dot {
+  from { opacity: 0.4; transform: scale(0.85); }
+  to { opacity: 1; transform: scale(1.15); }
+}
+
+.inline-console-input {
+  flex: 1;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: var(--radius-sm);
+  padding: 6px 10px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: #0f172a;
+  outline: none;
+  transition: all var(--transition);
+}
+
+.inline-console-input:focus {
+  border-color: #0284c7;
+  box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.2);
+}
+
+.console-status-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 2px 0;
+  font-size: 11px;
+  color: var(--text-muted);
+}
 
 /* ── Help Modal ── */
 .modal-backdrop {

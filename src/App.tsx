@@ -72,6 +72,9 @@ export default function App() {
   const [currentLine, setCurrentLine] = useState<number | null>(null);
   const [breakpoints, setBreakpoints] = useState<Set<number>>(new Set());
   const [output, setOutput] = useState('');
+  const [inlineDraft, setInlineDraft] = useState('');
+  const inlineInputRef = useRef<HTMLInputElement>(null);
+  const outputBodyRef = useRef<HTMLDivElement>(null);
   const [speed, setSpeed] = useState(10); // instructions per second
   const [memBase, setMemBase] = useState(0x10000); // default to DS 0x1000
   const [port1Value, setPort1Value] = useState<number>(0);
@@ -161,6 +164,10 @@ export default function App() {
   // here — the launcher button remains for manual opening without affecting
   // the emulator.
   const ensureConsoleForOutput = useCallback(() => {
+    // Only auto-open separate OS windows in Tauri desktop app. In browsers,
+    // window.open from an async execution loop is treated as an unsolicited popup
+    // and blocked by browser security. In web mode, the integrated in-page console handles output.
+    if (!isTauri()) return;
     const now = Date.now();
     if (now - consoleLastTryRef.current < 2000) return;
     consoleLastTryRef.current = now;
@@ -231,6 +238,26 @@ export default function App() {
     else consoleBroadcast({ type: 'input-mode', mode: 'line', max: m.max });
   }, []);
 
+  // Delivers input text (from internal or external console) into keyboard queue
+  // and resumes CPU execution if parked on a blocking read.
+  const deliverInputText = useCallback((text: string) => {
+    if (!text) return;
+    const cpu = cpuRef.current;
+    const wasWaiting = cpu ? isWaitingForInput(cpu) : false;
+    queueRef.current.push(text);
+    broadcastInputMode();
+    if (wasWaiting && statusRef.current === 'paused') {
+      if (resumeAfterInputRef.current === 'run') {
+        resumeAfterInputRef.current = null;
+        setErrorMsg('');
+        setStatus('running');
+      } else {
+        resumeAfterInputRef.current = null;
+        handleStepRef.current();
+      }
+    }
+  }, [broadcastInputMode, isWaitingForInput]);
+
   // Answer full-state sync requests from (re)opened console windows.
   // Also receives keystrokes typed directly into the console window
   // ('input-data') and input-mode polls from newly opened consoles.
@@ -252,32 +279,13 @@ export default function App() {
             seenInputIdsRef.current = new Set([...seenInputIdsRef.current].slice(-100));
           }
         }
-        const cpu = cpuRef.current;
-        // Was the CPU parked on a blocking read with nothing queued? If so
-        // this text satisfies it — queue first, then resume below.
-        const wasWaiting = cpu ? isWaitingForInput(cpu) : false;
-        if (msg.text) queueRef.current.push(msg.text);
-        broadcastInputMode();
-        if (wasWaiting && msg.text && statusRef.current === 'paused') {
-          if (resumeAfterInputRef.current === 'run') {
-            // Wait began during a continuous run — resume it; the run loop
-            // restarts through the existing single-flight status effect.
-            resumeAfterInputRef.current = null;
-            setErrorMsg('');
-            setStatus('running');
-          } else {
-            // Manual stepping — satisfy just the blocked read with one step
-            // so the typed character echoes immediately without running away.
-            resumeAfterInputRef.current = null;
-            handleStepRef.current();
-          }
-        }
+        deliverInputText(msg.text);
       }
       // This window owns the source of truth; append/sync/clear/input-mode
       // messages are meant for console windows and are deliberately ignored.
     });
     return unsubscribe;
-  }, [broadcastInputMode, isWaitingForInput]);
+  }, [broadcastInputMode, deliverInputText]);
 
   // ── Output handler (INT 21h writes land here) ──
   const appendOutput = useCallback((ch: string) => {
@@ -302,6 +310,7 @@ export default function App() {
     setErrorMsg('');
     setOutput('');
     outputRef.current = '';
+    setInlineDraft('');
     consoleBroadcast({ type: 'clear' });
     // Fresh program => fresh keyboard queue (stale keystrokes from a
     // previous run must not leak into the next INT 21h read).
@@ -549,6 +558,7 @@ export default function App() {
     setCurrentLine(null);
     setOutput('');
     outputRef.current = '';
+    setInlineDraft('');
     queueRef.current.clear();
     resumeAfterInputRef.current = null;
     consoleBroadcast({ type: 'clear' });
@@ -570,6 +580,7 @@ export default function App() {
   const handleClearOutput = useCallback(() => {
     outputRef.current = '';
     setOutput('');
+    setInlineDraft('');
     consoleBroadcast({ type: 'clear' });
   }, []);
 
@@ -695,6 +706,20 @@ export default function App() {
   const inputMode = cpuRef.current && (status === 'ready' || status === 'paused' || status === 'running')
     ? pendingInputMode(cpuRef.current, instrMapRef.current)
     : null;
+
+  // Auto-scroll inline console output
+  useEffect(() => {
+    if (outputBodyRef.current) {
+      outputBodyRef.current.scrollTop = outputBodyRef.current.scrollHeight;
+    }
+  }, [output, inlineDraft]);
+
+  // Focus input automatically when program requests keyboard input
+  useEffect(() => {
+    if (inputMode && inlineInputRef.current) {
+      inlineInputRef.current.focus();
+    }
+  }, [inputMode]);
 
   const controlsProps = {
     status, canRun, canStep, canPause, errorMsg, speed,
@@ -893,62 +918,124 @@ export default function App() {
             {/* I/O PORTS */}
             <IoPortsPanel port1Value={port1Value} onPort1Change={setPort1Value} />
 
-            {/* Console lives in its own OS window now; launcher + copy/clear here */}
+            {/* Built-in Console Output & Keyboard Input */}
             <div className="sidebar-section console-section">
               <div className="sidebar-section-header output-header">
                 <span>CONSOLE OUTPUT</span>
-                {output.length > 0 && (
-                  <span style={{ display: 'inline-flex', gap: '4px' }}>
-                    <button
-                      className="clear-btn"
-                      onClick={handleCopyOutput}
-                      title="Copy console output to the clipboard"
-                      onMouseEnter={() => setHint('Copy — copy all console output text to the clipboard.')}
-                      onMouseLeave={() => setHint(null)}
-                    >
-                      {copied ? '✓ Copied' : 'Copy'}
-                    </button>
-                    <button
-                      className="clear-btn"
-                      onClick={handleClearOutput}
-                      title="Clear console output (main + console window)"
-                      onMouseEnter={() => setHint('Clear — erase console output here and in the Console window.')}
-                      onMouseLeave={() => setHint(null)}
-                    >
-                      Clear
-                    </button>
-                  </span>
-                )}
-              </div>
-              <div className="console-external-note">
-                <span>Output appears in a separate Console window.</span>
-                <button
-                  className="btn btn-ghost"
-                  onClick={handleOpenConsole}
-                  title="Open (or focus) the external console window"
-                  onMouseEnter={() => setHint('Console — open the separate output window. It also opens by itself on the first print.')}
-                  onMouseLeave={() => setHint(null)}
-                >
-                  🖥 {output.length > 0 ? 'Show Console' : 'Open Console'}
+                <span style={{ display: 'inline-flex', gap: '4px' }}>
                   {output.length > 0 && (
-                    <span className="output-count-badge" title={`${output.length} characters of output`}>
-                      {output.length > 999 ? '999+' : output.length}
-                    </span>
+                    <>
+                      <button
+                        className="clear-btn"
+                        onClick={handleCopyOutput}
+                        title="Copy console output to the clipboard"
+                        onMouseEnter={() => setHint('Copy — copy all console output text to the clipboard.')}
+                        onMouseLeave={() => setHint(null)}
+                      >
+                        {copied ? '✓ Copied' : 'Copy'}
+                      </button>
+                      <button
+                        className="clear-btn"
+                        onClick={handleClearOutput}
+                        title="Clear console output"
+                        onMouseEnter={() => setHint('Clear — erase console output.')}
+                        onMouseLeave={() => setHint(null)}
+                      >
+                        Clear
+                      </button>
+                    </>
                   )}
-                </button>
+                  <button
+                    className="clear-btn"
+                    onClick={handleOpenConsole}
+                    title="Pop out console in a separate window"
+                    onMouseEnter={() => setHint('Pop out — open external console window.')}
+                    onMouseLeave={() => setHint(null)}
+                  >
+                    ↗ Pop out
+                  </button>
+                </span>
               </div>
-              <div className="input-section">
-                <span>Keyboard Input</span>
-                <div className="console-external-note">
-                  {inputMode?.kind === 'line' ? (
-                    <span>⌨ Waiting for {inputMode.max} chars max — click the Console window and type there, then Enter.</span>
-                  ) : inputMode?.kind === 'char' ? (
-                    <span>⌨ Waiting for a key — click the Console window and press any key.</span>
-                  ) : (
-                    <span>⌨ Programs read the keyboard from the Console window — click it and type when asked.</span>
-                  )}
+
+              {/* CRT Terminal Screen */}
+              <div
+                className={`output-body${inputMode ? ' awaiting-input' : ''}`}
+                ref={outputBodyRef}
+              >
+                {output ? (
+                  <span className="output-text">{output}</span>
+                ) : (
+                  <span className="output-placeholder">INT 21h program output will appear here…</span>
+                )}
+                {inputMode && (
+                  <span className="output-text" aria-hidden="true">{inlineDraft}</span>
+                )}
+                {inputMode && <span className="output-cursor" aria-hidden="true" />}
+              </div>
+
+              {/* Interactive Input Bar when waiting for INT 21h / INT 16h input */}
+              {inputMode ? (
+                <div className="inline-input-container">
+                  <div className="inline-input-label">
+                    <span className="inline-input-pulse" />
+                    {inputMode.kind === 'line'
+                      ? `Waiting for string (max ${inputMode.max} chars):`
+                      : 'Waiting for keypress:'}
+                  </div>
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    <input
+                      ref={inlineInputRef}
+                      type="text"
+                      className="inline-console-input"
+                      value={inlineDraft}
+                      onChange={e => {
+                        if (inputMode.kind === 'line') {
+                          setInlineDraft(e.target.value.slice(0, inputMode.max));
+                        }
+                      }}
+                      onKeyDown={e => {
+                        if (inputMode.kind === 'char') {
+                          e.preventDefault();
+                          const ch = e.key === 'Enter' ? '\r' : (e.key.length === 1 ? e.key : '');
+                          if (ch) {
+                            setInlineDraft('');
+                            deliverInputText(ch);
+                          }
+                        } else if (inputMode.kind === 'line') {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            const text = inlineDraft;
+                            setInlineDraft('');
+                            deliverInputText(text + '\r');
+                          }
+                        }
+                      }}
+                      placeholder={inputMode.kind === 'line' ? 'Type text and press Enter…' : 'Press any key…'}
+                      autoFocus
+                    />
+                    {inputMode.kind === 'line' && (
+                      <button
+                        className="btn btn-sm btn-primary"
+                        style={{ padding: '4px 10px', fontSize: '11px' }}
+                        onClick={() => {
+                          const text = inlineDraft;
+                          setInlineDraft('');
+                          deliverInputText(text + '\r');
+                        }}
+                      >
+                        Send
+                      </button>
+                    )}
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="console-status-bar">
+                  <span>{output.length > 0 ? `${output.length} characters` : 'Ready'}</span>
+                  <span style={{ color: 'var(--text-muted)', fontSize: '10.5px' }}>
+                    {isTauri() ? 'Desktop mode' : 'Browser mode'}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
         </div>
