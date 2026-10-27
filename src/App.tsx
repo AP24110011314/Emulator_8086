@@ -160,43 +160,9 @@ export default function App() {
   // window keeps the source of truth; the console window only displays it.
   // The console opens on demand: automatically when program output arrives
   // and the window isn't already open, or anytime via the "Open Console"
-  // launcher. Quiet: failures (e.g. a browser popup blocker) stay silent
-  // here — the launcher button remains for manual opening without affecting
-  // the emulator.
-  const ensureConsoleForOutput = useCallback(() => {
-    // Only auto-open separate OS windows in Tauri desktop app. In browsers,
-    // window.open from an async execution loop is treated as an unsolicited popup
-    // and blocked by browser security. In web mode, the integrated in-page console handles output.
-    if (!isTauri()) return;
-    const now = Date.now();
-    if (now - consoleLastTryRef.current < 2000) return;
-    consoleLastTryRef.current = now;
-    void (async () => {
-      try {
-        // Real check — never assume. An already-open window is left alone
-        // (no focus stealing); a missing one is opened and synced.
-        if (await isConsoleWindowOpen()) return;
-        const res = await openConsoleWindow();
-        if (res.opened) {
-          consoleBroadcast({ type: 'sync', full: outputRef.current });
-        }
-      } catch {
-        // Quiet: manual launcher reports failures to the user.
-      }
-    })();
-  }, []);
+  // Console output is integrated in-page; no external popups needed.
+  const ensureConsoleForOutput = useCallback(() => {}, []);
 
-  const handleOpenConsole = useCallback(() => {
-    void openConsoleWindow().then(res => {
-      if (res.opened) {
-        consoleBroadcast({ type: 'sync', full: outputRef.current });
-      } else if (isTauri()) {
-        setErrorMsg('Could not open the Console window (Tauri error) — try relaunching the app.');
-      } else {
-        setErrorMsg('Console popup was blocked — allow popups for this site, then click Open Console again.');
-      }
-    });
-  }, []);
 
   // ── Blocking-input check ──
   // True when the next instruction is a blocking keyboard read (INT 21h
@@ -945,15 +911,6 @@ export default function App() {
                       </button>
                     </>
                   )}
-                  <button
-                    className="clear-btn"
-                    onClick={handleOpenConsole}
-                    title="Pop out console in a separate window"
-                    onMouseEnter={() => setHint('Pop out — open external console window.')}
-                    onMouseLeave={() => setHint(null)}
-                  >
-                    ↗ Pop out
-                  </button>
                 </span>
               </div>
 
@@ -961,6 +918,8 @@ export default function App() {
               <div
                 className={`output-body${inputMode ? ' awaiting-input' : ''}`}
                 ref={outputBodyRef}
+                onClick={() => inlineInputRef.current?.focus()}
+                title={inputMode ? 'Click here to focus input' : 'Console output area'}
               >
                 {output ? (
                   <span className="output-text">{output}</span>
@@ -979,8 +938,8 @@ export default function App() {
                   <div className="inline-input-label">
                     <span className="inline-input-pulse" />
                     {inputMode.kind === 'line'
-                      ? `Waiting for string (max ${inputMode.max} chars):`
-                      : 'Waiting for keypress:'}
+                      ? `Waiting for string input (max ${inputMode.max} chars):`
+                      : 'Waiting for keystroke (press any key):'}
                   </div>
                   <div style={{ display: 'flex', gap: '6px' }}>
                     <input
@@ -1010,29 +969,39 @@ export default function App() {
                           }
                         }
                       }}
+                      onPaste={e => {
+                        if (inputMode.kind === 'char') {
+                          e.preventDefault();
+                          const pasted = e.clipboardData.getData('text');
+                          if (pasted) {
+                            setInlineDraft('');
+                            deliverInputText(pasted[0]);
+                          }
+                        }
+                      }}
                       placeholder={inputMode.kind === 'line' ? 'Type text and press Enter…' : 'Press any key…'}
                       autoFocus
                     />
                     {inputMode.kind === 'line' && (
                       <button
                         className="btn btn-sm btn-primary"
-                        style={{ padding: '4px 10px', fontSize: '11px' }}
+                        style={{ padding: '6px 14px', fontSize: '11.5px', fontWeight: 600 }}
                         onClick={() => {
                           const text = inlineDraft;
                           setInlineDraft('');
                           deliverInputText(text + '\r');
                         }}
                       >
-                        Send
+                        Enter ↵
                       </button>
                     )}
                   </div>
                 </div>
               ) : (
                 <div className="console-status-bar">
-                  <span>{output.length > 0 ? `${output.length} characters` : 'Ready'}</span>
-                  <span style={{ color: 'var(--text-muted)', fontSize: '10.5px' }}>
-                    {isTauri() ? 'Desktop mode' : 'Browser mode'}
+                  <span>{output.length > 0 ? `${output.length} characters` : 'Console Ready'}</span>
+                  <span style={{ color: 'var(--text-muted)', fontSize: '11px' }}>
+                    Standard I/O Active
                   </span>
                 </div>
               )}
