@@ -945,56 +945,118 @@ html, body, #root {
 .memory-hex-body {
   background: #ffffff;
   border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 6px 8px;
+  border-radius: 8px;
+  padding: 8px 12px;
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  max-height: 180px;
+  gap: 3px;
+  max-height: 280px;
   overflow-y: auto;
-  box-shadow: inset 0 1px 2px rgba(0,0,0,0.02);
+  overflow-x: auto;
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.03);
+}
+
+.memory-header-row {
+  display: flex;
+  align-items: center;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border-light);
+  margin-bottom: 4px;
+  white-space: nowrap;
+  min-width: fit-content;
+}
+
+.mem-addr-header {
+  width: 58px;
+  flex-shrink: 0;
+}
+
+.mem-bytes-header {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.mem-col-header {
+  width: 24px;
+  text-align: center;
+}
+
+.mem-ascii-header {
+  margin-left: 14px;
+  padding-left: 10px;
+  border-left: 1px solid transparent;
+  flex-shrink: 0;
 }
 
 .memory-row {
   display: flex;
   align-items: center;
   font-family: var(--font-mono);
-  font-size: 10px;
-  line-height: 1.6;
-  white-space: pre;
+  font-size: 12px;
+  line-height: 1.8;
+  white-space: nowrap;
+  min-width: fit-content;
 }
 
 .mem-addr {
-  color: var(--text-muted);
-  min-width: 44px;
-  margin-right: 6px;
-  font-weight: 600;
+  color: #0f766e;
+  font-weight: 700;
+  width: 58px;
+  flex-shrink: 0;
+  letter-spacing: 0.5px;
 }
 
 .mem-bytes {
   display: flex;
-  gap: 4px;
+  gap: 8px;
+  flex-shrink: 0;
 }
 
 .mem-byte {
   color: #64748b;
-  min-width: 17px;
+  width: 24px;
   text-align: center;
+  border-radius: 3px;
+  transition: all var(--transition);
+  font-weight: 500;
 }
 .mem-byte.active {
   color: #0284c7;
   font-weight: 700;
+  background: rgba(2, 132, 199, 0.08);
+}
+.mem-byte:hover {
+  background: #ccfbf1;
+  color: #0f766e;
+  transform: scale(1.15);
+  z-index: 1;
 }
 
 .mem-ascii {
-  margin-left: 8px;
-  padding-left: 6px;
+  margin-left: 14px;
+  padding-left: 10px;
   border-left: 1px solid var(--border);
   display: flex;
-  gap: 1px;
+  gap: 3px;
+  flex-shrink: 0;
+  font-family: var(--font-mono);
 }
-.mem-ascii .printable { color: #059669; font-weight: 600; }
-.mem-ascii .dot { color: #cbd5e1; }
+.mem-ascii .printable {
+  color: #059669;
+  font-weight: 700;
+  width: 10px;
+  text-align: center;
+}
+.mem-ascii .dot {
+  color: #cbd5e1;
+  width: 10px;
+  text-align: center;
+}
 
 /* ── Console Output with Clear button ── */
 .output-panel-container {

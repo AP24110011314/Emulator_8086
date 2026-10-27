@@ -104,11 +104,19 @@ export function MemoryViewer({ cpu, cpuState, baseAddress, onBaseChange }: Memor
 
       {/* Hex Dump */}
       <div className="memory-hex-body">
+        <div className="memory-header-row">
+          <span className="mem-addr-header">Address</span>
+          <span className="mem-bytes-header">
+            {Array.from({ length: BYTES_PER_ROW }, (_, i) => (
+              <span key={i} className="mem-col-header">+{i.toString(16).toUpperCase()}</span>
+            ))}
+          </span>
+          <span className="mem-ascii-header">ASCII</span>
+        </div>
+
         {rows.map(({ rowAddr, bytes }) => (
           <div key={rowAddr} className="memory-row">
-            <span className="mem-addr">
-              {rowAddr.toString(16).toUpperCase().padStart(5, '0')}
-            </span>
+            <span className="mem-addr">{rowAddr.toString(16).toUpperCase().padStart(5, '0')}</span>
             <span className="mem-bytes">
               {bytes.map((b, i) => (
                 <span
@@ -116,16 +124,12 @@ export function MemoryViewer({ cpu, cpuState, baseAddress, onBaseChange }: Memor
                   className={`mem-byte ${b !== 0 ? 'active' : ''}`}
                   id={`mem-${(rowAddr + i).toString(16)}`}
                   title={`0x${(rowAddr + i).toString(16).toUpperCase().padStart(5, '0')} — ${b.toString(16).toUpperCase().padStart(2, '0')}h (${b})`}
-                >
-                  {b.toString(16).toUpperCase().padStart(2, '0')}
-                </span>
+                >{b.toString(16).toUpperCase().padStart(2, '0')}</span>
               ))}
             </span>
             <span className="mem-ascii">
               {bytes.map((b, i) => (
-                <span key={i} className={isPrintable(b) ? 'printable' : 'dot'}>
-                  {isPrintable(b) ? String.fromCharCode(b) : '·'}
-                </span>
+                <span key={i} className={isPrintable(b) ? 'printable' : 'dot'}>{isPrintable(b) ? String.fromCharCode(b) : '·'}</span>
               ))}
             </span>
           </div>
