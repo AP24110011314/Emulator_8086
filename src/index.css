@@ -1668,3 +1668,359 @@ html, body, #root {
   letter-spacing: normal;
   font-size: 11.5px;
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Mobile & Tablet Responsiveness (< 900px and < 600px)
+   Fluid, touch-friendly, scrollable layout for phones and tablets
+═══════════════════════════════════════════════════════════════════════════ */
+
+@media (max-width: 900px) {
+  html, body, #root {
+    height: auto;
+    min-height: 100%;
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .app {
+    display: flex;
+    flex-direction: column;
+    height: auto;
+    min-height: 100vh;
+    overflow-x: hidden;
+    overflow-y: visible;
+  }
+
+  /* Top Toolbar: horizontally scrollable so nothing is squashed or cut off */
+  .app-header {
+    height: 52px;
+    padding: 0 12px;
+    gap: 10px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    flex-shrink: 0;
+  }
+  .app-header::-webkit-scrollbar {
+    display: none;
+  }
+  .app-logo, .header-status, .header-nav, .header-right-controls {
+    flex-shrink: 0;
+  }
+
+  /* Main layout: vertical stack (editor on top, sidebar below) */
+  .app-main {
+    display: flex;
+    flex-direction: column;
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+    grid-template-columns: none;
+  }
+
+  /* Left panel (Editor section) */
+  .left-panel {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: auto;
+    border-right: none;
+    border-bottom: 2px solid var(--border);
+    overflow: visible;
+  }
+
+  .left-panel .panel {
+    height: 380px !important;
+    min-height: 300px;
+    flex: none !important;
+  }
+
+  .panel-body {
+    flex: 1;
+    min-height: 0;
+    height: calc(100% - 38px);
+    overflow: hidden;
+  }
+
+  .editor-container {
+    height: 100%;
+  }
+
+  /* Controls Bar: wrap cleanly into touch-friendly rows */
+  .controls-bar {
+    padding: 8px 12px;
+    gap: 8px;
+    justify-content: flex-start;
+  }
+  .controls-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .controls-sep {
+    display: none;
+  }
+  .btn {
+    min-height: 36px;
+    padding: 6px 12px;
+    font-size: 12px;
+  }
+  .speed-control {
+    width: 100%;
+    margin-left: 0;
+    margin-top: 4px;
+    padding-top: 6px;
+    border-top: 1px dashed var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  /* Status Bar */
+  .status-bar {
+    padding: 6px 12px;
+    gap: 10px;
+    overflow-x: auto;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .status-bar::-webkit-scrollbar {
+    display: none;
+  }
+  .status-item {
+    flex-shrink: 0;
+  }
+
+  /* Right panel (Registers, LEDs, Ports, Console) */
+  .right-panel {
+    width: 100%;
+    height: auto;
+    border-left: none;
+    overflow: visible;
+  }
+  .sidebar-container {
+    padding: 12px 10px;
+    gap: 12px;
+  }
+
+  /* CPU Details Grid */
+  .cpu-details-grid {
+    grid-template-columns: 1fr;
+    padding: 12px 12px 24px;
+    gap: 12px;
+  }
+
+  /* Sticky Help Footer */
+  .app-footer {
+    position: sticky;
+    bottom: 0;
+    background: var(--bg-toolbar);
+    border-top: 1px solid var(--border);
+    padding: 6px 14px;
+    height: 42px;
+    z-index: 90;
+    box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.05);
+  }
+}
+
+@media (max-width: 600px) {
+  /* Ultra-compact header for mobile phones */
+  .logo-title {
+    font-size: 13px;
+  }
+  .sample-select {
+    max-width: 150px;
+    font-size: 11px;
+    padding: 4px 22px 4px 8px;
+  }
+  .header-nav-btn {
+    padding: 4px 10px;
+    font-size: 11.5px;
+  }
+
+  /* Touch controls optimization */
+  .controls-bar {
+    padding: 6px 8px;
+    gap: 6px;
+  }
+  .controls-group {
+    width: 100%;
+    gap: 5px;
+  }
+  .controls-group .btn {
+    flex: 1 1 auto;
+    min-width: 58px;
+    justify-content: center;
+    font-size: 11.5px;
+    padding: 7px 8px;
+  }
+  .controls-group-label {
+    display: none;
+  }
+  .speed-control {
+    gap: 6px;
+  }
+  .speed-slider {
+    width: 55px;
+  }
+
+  /* Editor sizing on small screens */
+  .left-panel .panel {
+    height: 330px !important;
+    min-height: 250px;
+  }
+  .editor-gutter {
+    width: 34px;
+    font-size: 11px;
+    padding-right: 4px;
+  }
+  .editor-textarea {
+    font-size: 12.5px;
+    padding: 8px 8px;
+  }
+  .panel-header {
+    padding: 6px 8px;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .file-name {
+    max-width: 90px;
+  }
+
+  /* Register layout on phones: compact & 2-column pointer/segment grid */
+  .reg-row-gp {
+    gap: 4px;
+    justify-content: space-between;
+  }
+  .reg-box-16 {
+    min-width: 44px;
+    font-size: 11px;
+    padding: 2px 4px;
+  }
+  .reg-box-8 {
+    min-width: 24px;
+    font-size: 10.5px;
+    padding: 2px 4px;
+  }
+  .reg-single-col {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px 12px;
+  }
+  .reg-row-single {
+    justify-content: space-between;
+  }
+
+  /* Flags & LEDs on phones */
+  .flags-row {
+    grid-template-columns: repeat(6, 1fr);
+    gap: 3px;
+  }
+  .flag-tile {
+    padding: 4px 1px;
+  }
+  .flag-tile-name {
+    font-size: 8.5px;
+  }
+  .flag-tile-value {
+    font-size: 12px;
+  }
+  .led-row {
+    gap: 2px;
+  }
+  .led-circle {
+    width: 24px;
+    height: 24px;
+    font-size: 10px;
+  }
+  .led-labels {
+    font-size: 9px;
+  }
+
+  /* Console Output & Input on phones */
+  .output-body {
+    min-height: 180px;
+    max-height: 280px;
+    font-size: 12px;
+    padding: 10px 10px;
+  }
+  /* Prevent iOS Safari auto-zoom by setting input font-size to 16px */
+  .inline-console-input,
+  .io-input,
+  .goto-input {
+    font-size: 16px !important;
+  }
+  .inline-input-container {
+    padding: 8px 10px;
+  }
+  .inline-input-label {
+    font-size: 11px;
+  }
+
+  /* Memory section on phones */
+  .goto-controls-bar {
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 6px 8px;
+  }
+  .goto-input {
+    width: 64px;
+  }
+  .segment-select {
+    width: 100px;
+  }
+
+  /* CPU Details Toolbar on phones */
+  .cpu-details-toolbar {
+    padding: 8px 10px;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .cpu-details-sub {
+    display: none;
+  }
+
+  /* Help Modal on phones */
+  .help-modal {
+    width: 95vw;
+    max-height: 88vh;
+    border-radius: var(--radius-md);
+  }
+  .help-modal-header {
+    padding: 10px 12px;
+  }
+  .help-modal-title {
+    font-size: 12.5px;
+  }
+  .help-modal-body {
+    padding: 12px 14px;
+    gap: 12px;
+  }
+  .help-grid {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+  .help-flags-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
+  }
+}
+
+/* Touch device adjustments: eliminate sticky hover transforms on tap */
+@media (hover: none) {
+  .reg-box:hover,
+  .flag-tile:hover,
+  .led-circle:hover,
+  .mem-byte:hover,
+  .btn:not(:disabled):hover,
+  .btn-help-top:hover,
+  .chip:hover {
+    transform: none;
+  }
+}
+
