@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="chipGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0284c7" />
+      <stop offset="100%" stop-color="#0f172a" />
+    </linearGradient>
+    <linearGradient id="pinGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#f59e0b" />
+      <stop offset="100%" stop-color="#d97706" />
+    </linearGradient>
+  </defs>
+
+  <!-- Top Pins -->
+  <rect x="12" y="2" width="5" height="7" rx="1.5" fill="url(#pinGrad)" />
+  <rect x="22" y="2" width="5" height="7" rx="1.5" fill="url(#pinGrad)" />
+  <rect x="32" y="2" width="5" height="7" rx="1.5" fill="url(#pinGrad)" />
+  <rect x="42" y="2" width="5" height="7" rx="1.5" fill="url(#pinGrad)" />
+
+  <!-- Bottom Pins -->
+  <rect x="12" y="55" width="5" height="7" rx="1.5" fill="url(#pinGrad)" />
+  <rect x="22" y="55" width="5" height="7" rx="1.5" fill="url(#pinGrad)" />
+  <rect x="32" y="55" width="5" height="7" rx="1.5" fill="url(#pinGrad)" />
+  <rect x="42" y="55" width="5" height="7" rx="1.5" fill="url(#pinGrad)" />
+
+  <!-- Main Chip Body -->
+  <rect x="6" y="8" width="52" height="48" rx="8" fill="url(#chipGrad)" stroke="#38bdf8" stroke-width="1.5" />
+
+  <!-- Inner Die Area -->
+  <rect x="10" y="12" width="44" height="40" rx="5" fill="#090d16" stroke="#1e293b" stroke-width="1" />
+
+  <!-- Pin 1 Dot -->
+  <circle cx="16" cy="19" r="2.5" fill="#38bdf8" />
+
+  <!-- "8086" text -->
+  <text x="32" y="37" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'JetBrains Mono', monospace" font-size="13" font-weight="900" fill="#38bdf8" text-anchor="middle" letter-spacing="0.5">8086</text>
+  <text x="32" y="47" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="7" font-weight="800" fill="#94a3b8" text-anchor="middle" letter-spacing="1">CPU</text>
+</svg>
