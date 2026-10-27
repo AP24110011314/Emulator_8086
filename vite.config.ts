@@ -2,6 +2,7 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
 export default defineConfig({
+  base: './',
   plugins: [react()],
   // Tauri expects the dev server at a fixed URL (see src-tauri/tauri.conf.json
   // devUrl). strictPort prevents Vite from silently drifting to another port.

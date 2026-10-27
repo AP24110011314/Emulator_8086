@@ -4,15 +4,15 @@ Browser-based Intel 8086 emulator: assembler + step/run CPU + registers/flags/me
 
 ## Commands
 
-- `npm run dev` — Vite dev server (fixed port 5173, `strictPort`; required by Tauri `devUrl`)
-- `npm test` — all Vitest unit tests (Node only, no browser); single file: `npx vitest run tests/core/<name>.test.ts`
+- `npm run dev` — Vite dev server (fixed port 5173, `strictPort`; required by Tauri `devUrl`). `npm run tauri dev` auto-starts Vite via `beforeDevCommand` — don't run `npm run dev` separately.
+- `npm test` — all Vitest unit tests (Node only, no browser); single file: `npx vitest run tests/core/<name>.test.ts`.
 - `npm run build` — `tsc --noEmit` typecheck, then `vite build` into `dist/` (Tauri `frontendDist` + `beforeBuildCommand`; `dist/` is gitignored). No lint or formatter script.
-- `npm run tauri dev` — native dev window (auto-starts Vite via `beforeDevCommand`; don't run `npm run dev` separately). `npm run build:mac` — release `.app` + `.dmg` into `src-tauri/target/release/bundle/`.
+- `npm run build:mac` — release `.app` + `.dmg` into `src-tauri/target/release/bundle/`. Requires Rust toolchain.
 - Verify changes with `npm run build && npm test`.
 
 ## Architecture
 
-- `src/core/` is framework-free TS (no DOM/React), unit-tested in Node: `cpu.ts`, `assembler.ts`, `memory.ts`, `interrupts.ts`, `types.ts`. `src/components/` is the React 18 UI.
+- `src/core/` is framework-free TS (no DOM/React), unit-tested in Node: `cpu.ts`, `assembler.ts`, `memory.ts`, `interrupts.ts`, `types.ts`. `src/components/` is the React 18 UI. `src-tauri/` contains the Rust Tauri shell (Cargo.toml, capabilities, tauri.conf.json).
 - `src/core/assembler.ts` is the source of truth for parsing/directives (`ORG`, `DB`/`DW`/`DD`, `.MODEL`, `SEGMENT`, `PROC`, `END`) — labels resolve to physical addresses, `dataSegmentParagraph` is `0x1000`. `src/samples/index.ts` is the UI sample registry (inline strings; sibling `.asm` files are inert mirrors — editing them alone changes nothing).
 - **Execution model (critical):** programs run via `assemble(source)` → write each `instruction.bytes` to `ai.address` in memory, build `Map<address, AssembledInstruction>`, then call `cpu.execute(instruction)` directly. `dataBytes` must also be loaded at `dataSegmentParagraph << 4`. See `programStep` in `src/App.tsx:94` or `runSnippet` in `tests/core/suite_8086.test.ts`.
 - **IP-advance asymmetry:** `cpu.decode()` advances IP, but `cpu.execute()` does not — the direct-`execute()` harness must advance IP manually when unchanged (`IP = (ip + instruction.bytes.length) & 0xffff`). Never route assembled code through `decode()`/`step()` (double-advances/mis-decodes; `decodeOpcode` covers only a subset and returns `UNKNOWN`, which `execute()` throws on).
@@ -21,9 +21,10 @@ Browser-based Intel 8086 emulator: assembler + step/run CPU + registers/flags/me
 
 ## Tests
 
-- Vitest uses `globals: true`; six suites in `tests/core/` (`cpu`, `memory`, `suite_8086` per `8086_TEST_SUITE.md`, `instruction_reference`, `bug_reproduction`, `user_reported`). The large suites each define their own local `runSnippet`/`runAssembly` harness — copy the pattern rather than sharing it.
+- Vitest uses `globals: true`; 12 suites in `tests/core/`: `cpu`, `memory`, `suite_8086` (per `8086_TEST_SUITE.md`), `instruction_reference`, `bug_reproduction`, `user_reported`, `addressing_modes`, `assembler_edge`, `console_input`, `cpu_flags_audit`, `dos_services`, `run_step_parity`. The large suites each define their own local `runSnippet`/`runAssembly` harness — copy the pattern rather than sharing it.
 - `getState()` returns a copy — mutate only via `cpu.writeRegister` / `writeRegister8`; read via `readRegister16` / `readRegister8`. Physical addresses: `((seg << 4) + off) & 0xfffff` over flat 1 MB zero-init `Memory` (`src/core/memory.ts`).
 - `8086_TEST_SUITE.md` is the conformance spec. `INSTALL_MACOS.md` has the Gatekeeper `xattr -cr` workaround and aarch64-only details.
+- `src-tauri/tauri.conf.json` drives the Tauri build: `devUrl: "http://localhost:5173"`, `beforeDevCommand: "npm run dev"`, `beforeBuildCommand: "npm run build"`. Tauri commands (`tauri dev`, `tauri build`) require the Rust toolchain.
 
 ## Gotchas
 

@@ -11,9 +11,28 @@ src-tauri/gen/
 npm-debug.log*
 # Env / secrets
 .env
-.env.local
+.env.*
+!.env.example
 *.pem
 *.key
+
+# Deployment & cloud providers
+.vercel
+.netlify
+
+# Build & test artifacts
+coverage/
+*.tsbuildinfo
+vite.config.ts.timestamp-*
+
+# OS files
+.DS_Store
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+
 # Release artifacts (build locally with `npm run build:mac`, attach to GitHub Releases)
 *.dmg
 *.app
+
