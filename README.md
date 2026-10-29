@@ -50,22 +50,31 @@ xattr -cr /Applications/Emulator8086.app
 > Apple Silicon only (`aarch64`). Intel Macs: build from source
 > (`npm run build:mac` targets the host CPU).
 
-## 📸 Screenshots Of MacOS App
+## 📸 Screenshots of macOS App
 
-### Emulator App Interface
+🖥️ Emulator App Interface
 
-![8086 Emulator Demo 1](./screenshots/home_page.png)
----
+<div align="center">
+  <img src="./screenshots/home_page.png" alt="8086 Emulator App Interface" width="85%" />
+</div>
 
-<<<<<<< HEAD
-### Emulator Execution and features
+⸻
 
-![8086 Emulator Demo 2](./screenshots/2.png)
----
-### Emulator CPU Details Section
-![8086 Emulator Demo 1](./screenshots/3.png)
----
+⚙️ Emulator Execution and Features
 
+<div align="center">
+  <img src="./screenshots/2.png" alt="8086 Emulator Execution and Features" width="85%" />
+</div>
+
+⸻
+
+🧠 Emulator CPU Details Section
+
+<div align="center">
+  <img src="./screenshots/3.png" alt="8086 Emulator CPU Details" width="85%" />
+</div>
+
+⸻
 
 ## 🗂️ Project Structure
 =======
